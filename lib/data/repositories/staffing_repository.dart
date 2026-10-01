@@ -29,21 +29,21 @@ class StaffingRepository {
     String? alias,
     String? bio,
     String? fotoUrl,
-    bool independiente = false,
     bool perfilPublico = true,
     int traslacionMin = 30,
     required String rol,
     required String modalidad,
     required double comisionPct,
     String? desde,
+    String? telefono,
   }) async {
     try {
       final res = await _dio.post('/locales/$localId/profesionales', data: {
+        if (telefono != null && telefono.isNotEmpty) 'telefono': telefono,
         'nombre': nombre,
         if (alias != null && alias.isNotEmpty) 'alias': alias,
         if (bio != null && bio.isNotEmpty) 'bio': bio,
         if (fotoUrl != null && fotoUrl.isNotEmpty) 'foto_url': fotoUrl,
-        'independiente': independiente,
         'perfil_publico': perfilPublico,
         'traslado_min': traslacionMin,
         'rol': rol,
@@ -52,6 +52,32 @@ class StaffingRepository {
         if (desde != null) 'desde': desde,
       });
       return Profesional.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// Vincula (o cambia) la cuenta de acceso del profesional (§4.6). Solo quien
+  /// administra el local; 422 si el teléfono no es de una cuenta registrada o
+  /// ya está vinculada a otro profesional.
+  Future<Profesional> vincularCuenta(String profesionalId, {required String telefono}) async {
+    try {
+      final res = await _dio.post('/profesionales/$profesionalId/vincular-cuenta', data: {
+        'telefono': telefono,
+      });
+      return Profesional.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// Comisiones propias del profesional, de todos sus locales (solo él).
+  Future<List<Liquidacion>> misLiquidaciones(String profesionalId) async {
+    try {
+      final res = await _dio.get('/profesionales/$profesionalId/liquidaciones');
+      return (res.data as List<dynamic>)
+          .map((e) => Liquidacion.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       throw DioClient.mapearError(e);
     }
@@ -72,7 +98,6 @@ class StaffingRepository {
     String? alias,
     String? bio,
     String? fotoUrl,
-    bool? independiente,
     bool? perfilPublico,
     int? traslacionMin,
   }) async {
@@ -82,7 +107,6 @@ class StaffingRepository {
         if (alias != null) 'alias': alias,
         if (bio != null) 'bio': bio,
         if (fotoUrl != null) 'foto_url': fotoUrl,
-        if (independiente != null) 'independiente': independiente,
         if (perfilPublico != null) 'perfil_publico': perfilPublico,
         if (traslacionMin != null) 'traslado_min': traslacionMin,
       });
@@ -105,7 +129,7 @@ class StaffingRepository {
 
   Future<List<ProfesionalFoto>> listarFotosProfesional(String profesionalId) async {
     try {
-      final res = await _dio.get('/profesionales/$profesionalId/fotos');
+      final res = await _dio.get('/profesionales/$profesionalId/imagenes');
       return (res.data as List<dynamic>)
           .map((e) => ProfesionalFoto.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -116,7 +140,7 @@ class StaffingRepository {
 
   Future<ProfesionalFoto> crearFotoProfesional(String profesionalId, {required String url, int orden = 0}) async {
     try {
-      final res = await _dio.post('/profesionales/$profesionalId/fotos', data: {
+      final res = await _dio.post('/profesionales/$profesionalId/imagenes', data: {
         'url': url,
         'orden': orden,
       });
@@ -128,7 +152,7 @@ class StaffingRepository {
 
   Future<void> eliminarFotoProfesional(String profesionalId, String fotoId) async {
     try {
-      await _dio.delete('/profesionales/$profesionalId/fotos/$fotoId');
+      await _dio.delete('/imagenes/$fotoId');
     } catch (e) {
       throw DioClient.mapearError(e);
     }

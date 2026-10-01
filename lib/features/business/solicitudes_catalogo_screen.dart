@@ -46,11 +46,11 @@ class _SolicitudesCatalogoScreenState extends ConsumerState<SolicitudesCatalogoS
       context,
       title: 'Solicitar servicio nuevo',
       child: _SolicitudForm(
-        onGuardar: (vertical, nombre, descripcion) async {
+        onGuardar: (rubro, nombre, descripcion) async {
           try {
             await ref.read(catalogRepositoryProvider).crearSolicitud(
                   widget.localId,
-                  vertical: vertical,
+                  rubro: rubro,
                   nombrePropuesto: nombre,
                   descripcion: descripcion,
                 );
@@ -76,7 +76,7 @@ class _SolicitudesCatalogoScreenState extends ConsumerState<SolicitudesCatalogoS
       itemBuilder: (context, s) => CrudTile(
         icono: Icons.add_shopping_cart_outlined,
         titulo: s.nombrePropuesto,
-        subtitulo: '${etiquetaVertical(s.vertical)} · ${_etiquetaEstado(s.estado)}',
+        subtitulo: '${etiquetaRubro(s.rubro)} · ${_etiquetaEstado(s.estado)}',
       ),
     );
   }
@@ -90,7 +90,7 @@ class _SolicitudesCatalogoScreenState extends ConsumerState<SolicitudesCatalogoS
 }
 
 class _SolicitudForm extends StatefulWidget {
-  final Future<void> Function(String vertical, String nombre, String? descripcion) onGuardar;
+  final Future<void> Function(String rubro, String nombre, String? descripcion) onGuardar;
 
   const _SolicitudForm({required this.onGuardar});
 
@@ -100,7 +100,7 @@ class _SolicitudForm extends StatefulWidget {
 
 class _SolicitudFormState extends State<_SolicitudForm> {
   final _formKey = GlobalKey<FormState>();
-  String _vertical = verticalesDisponibles.first;
+  String _rubro = rubrosDisponibles.first;
   final _nombreCtrl = TextEditingController();
   final _descripcionCtrl = TextEditingController();
 
@@ -112,10 +112,10 @@ class _SolicitudFormState extends State<_SolicitudForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
-            value: _vertical,
-            decoration: const InputDecoration(labelText: 'Vertical'),
-            items: verticalesDisponibles.map((v) => DropdownMenuItem(value: v, child: Text(etiquetaVertical(v)))).toList(),
-            onChanged: (v) => setState(() => _vertical = v!),
+            value: _rubro,
+            decoration: const InputDecoration(labelText: 'Rubro'),
+            items: rubrosDisponibles.map((v) => DropdownMenuItem(value: v, child: Text(etiquetaRubro(v)))).toList(),
+            onChanged: (v) => setState(() => _rubro = v!),
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -134,7 +134,7 @@ class _SolicitudFormState extends State<_SolicitudForm> {
             formKey: _formKey,
             label: 'Enviar solicitud',
             onGuardar: () => widget.onGuardar(
-              _vertical,
+              _rubro,
               _nombreCtrl.text.trim(),
               _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
             ),

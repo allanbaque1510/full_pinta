@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/loading_overlay.dart';
 import '../../data/models/identity_models.dart';
 import '../../state/repository_providers.dart';
 
@@ -19,6 +20,7 @@ class ConsentimientosScreen extends ConsumerStatefulWidget {
 class _ConsentimientosScreenState extends ConsumerState<ConsentimientosScreen> {
   bool _cargando = true;
   String? _error;
+  List<FinalidadConsentimiento> _finalidades = [];
   Map<String, Consentimiento> _porFinalidad = {};
   final Set<String> _procesando = {};
 
@@ -34,9 +36,14 @@ class _ConsentimientosScreenState extends ConsumerState<ConsentimientosScreen> {
       _error = null;
     });
     try {
-      final lista = await ref.read(identityRepositoryProvider).obtenerConsentimientos();
+      final repo = ref.read(identityRepositoryProvider);
+      final resultados = await Future.wait([repo.obtenerFinalidades(), repo.obtenerConsentimientos()]);
       if (!mounted) return;
-      setState(() => _porFinalidad = {for (final c in lista) c.finalidad: c});
+      final lista = resultados[1] as List<Consentimiento>;
+      setState(() {
+        _finalidades = resultados[0] as List<FinalidadConsentimiento>;
+        _porFinalidad = {for (final c in lista) c.finalidad: c};
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = DioClient.mapearError(e).mensaje);
@@ -58,34 +65,64 @@ class _ConsentimientosScreenState extends ConsumerState<ConsentimientosScreen> {
     }
   }
 
+  void _leerDocumento(DocumentoLegal doc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${doc.tipo.replaceAll('_', ' ')} (v${doc.version})'),
+        content: SingleChildScrollView(
+          child: SelectableText(doc.contenido ?? doc.url ?? 'Documento no disponible.'),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar'))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Privacidad y consentimientos')),
-      body: _cargando
+      body: LoadingOverlay(
+        visible: _procesando.isNotEmpty,
+        mensaje: 'Guardando cambios...',
+        child: _cargando
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ErrorState(mensaje: _error!, onRetry: _cargar)
               : ListView(
                   padding: const EdgeInsets.all(16),
-                  children: finalidadesConsentimiento.map((f) {
-                    final actual = _porFinalidad[f];
-                    final otorgado = actual?.otorgado ?? false;
-                    final esObligatoria = f == 'operacion_servicio';
+                  children: _finalidades.map((f) {
+                    final otorgado = _porFinalidad[f.codigo]?.otorgado ?? false;
+                    final doc = f.documentoLegal;
                     return Card(
-                      child: SwitchListTile(
-                        title: Text(etiquetaFinalidad(f)),
-                        subtitle: esObligatoria
-                            ? const Text('Necesario para poder agendar y operar tus citas')
-                            : null,
-                        value: otorgado,
-                        onChanged: _procesando.contains(f) || esObligatoria
-                            ? null
-                            : (v) => _alternar(f, v),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SwitchListTile(
+                            title: Text(f.nombre),
+                            subtitle: Text(
+                              f.obligatorio ? '${f.descripcion}\nObligatorio para operar tus citas.' : f.descripcion,
+                            ),
+                            value: f.obligatorio ? true : otorgado,
+                            onChanged: _procesando.contains(f.codigo) || f.obligatorio
+                                ? null
+                                : (v) => _alternar(f.codigo, v),
+                          ),
+                          if (doc != null && (doc.contenido != null || doc.url != null))
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8, bottom: 4),
+                              child: TextButton.icon(
+                                onPressed: () => _leerDocumento(doc),
+                                icon: const Icon(Icons.description_outlined, size: 18),
+                                label: const Text('Leer documento'),
+                              ),
+                            ),
+                        ],
                       ),
                     );
                   }).toList(),
                 ),
+      ),
     );
   }
 }

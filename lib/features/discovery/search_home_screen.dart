@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/location.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/widgets/fullpinta_wordmark.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../data/models/catalog_models.dart';
 import '../../data/models/directory_models.dart';
@@ -45,7 +47,7 @@ class _SearchHomeScreenState extends ConsumerState<SearchHomeScreen> {
       final resultados = await repo.buscarLocales(
         lat: _ubicacion!.lat,
         lng: _ubicacion!.lng,
-        vertical: _filtros.vertical,
+        rubro: _filtros.rubro,
         precioMin: _filtros.precioMin,
         precioMax: _filtros.precioMax,
         amenidades: _filtros.amenidades.isEmpty ? null : _filtros.amenidades.toList(),
@@ -75,123 +77,188 @@ class _SearchHomeScreenState extends ConsumerState<SearchHomeScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Image.asset('assets/branding/logo.png', width: 28, height: 28),
-            const SizedBox(width: 10),
-            const Text('FullPinta'),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: _abrirFiltros,
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search, color: scheme.onSurfaceVariant, size: 20),
-                          const SizedBox(width: 10),
-                          Text(
-                            _resumenFiltros(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
-                        ],
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _cargarTodo,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              const Row(children: [FullPintaWordmark(tamano: 26)]),
+              const SizedBox(height: 4),
+              Text('Descubre belleza cerca de ti', style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _abrirFiltros,
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: scheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: scheme.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: scheme.onSurfaceVariant, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _resumenFiltros(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Badge(
-                  isLabelVisible: _filtros.activos,
-                  child: IconButton.filledTonal(
-                    onPressed: _abrirFiltros,
-                    icon: const Icon(Icons.tune),
+                  const SizedBox(width: 10),
+                  Badge(
+                    isLabelVisible: _filtros.activos,
+                    child: IconButton.outlined(
+                      onPressed: _abrirFiltros,
+                      icon: const Icon(Icons.tune),
+                      style: IconButton.styleFrom(side: BorderSide(color: scheme.outlineVariant)),
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 84,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _CategoriaCirculo(
+                      etiqueta: 'Todo',
+                      icono: Icons.apps_rounded,
+                      activo: _filtros.rubro == null,
+                      onTap: () {
+                        setState(() => _filtros = _filtros.copyWith(limpiarRubro: true));
+                        _cargarTodo();
+                      },
+                    ),
+                    ...rubrosDisponibles.where((v) => v != 'mascotas').map(
+                          (v) => _CategoriaCirculo(
+                            etiqueta: etiquetaRubro(v),
+                            icono: _iconoRubro(v),
+                            activo: _filtros.rubro == v,
+                            onTap: () {
+                              setState(() => _filtros = _filtros.copyWith(rubro: v));
+                              _cargarTodo();
+                            },
+                          ),
+                        ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(child: Text('Locales cerca de ti', style: textTheme.titleMedium)),
+                  if (_filtros.activos)
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _filtros = const SearchFilters());
+                        _cargarTodo();
+                      },
+                      child: const Text('Limpiar filtros'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_cargando)
+                const Padding(padding: EdgeInsets.symmetric(vertical: 48), child: Center(child: CircularProgressIndicator()))
+              else if (_error != null)
+                ErrorState(mensaje: _error!, onRetry: _cargarTodo)
+              else if (_resultados.isEmpty)
+                const EmptyState(
+                  mensaje: 'No encontramos locales con estos filtros. Prueba ampliando el radio o quitando alguno.',
+                  icono: Icons.storefront_outlined,
+                )
+              else
+                ..._resultados.map((l) => Padding(padding: const EdgeInsets.only(bottom: 14), child: _LocalCard(local: l))),
+            ],
           ),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [null, ...verticalesDisponibles.where((v) => v != 'mascotas')].map((v) {
-                final activo = _filtros.vertical == v;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(v == null ? 'Todas' : etiquetaVertical(v)),
-                    selected: activo,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() => _filtros = _filtros.copyWith(vertical: v, limpiarVertical: v == null));
-                      _cargarTodo();
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _cargarTodo,
-              child: _cargando
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? ErrorState(mensaje: _error!, onRetry: _cargarTodo)
-                      : _resultados.isEmpty
-                          ? const EmptyState(
-                              mensaje:
-                                  'No encontramos locales con estos filtros. Prueba ampliando el radio o quitando alguno.',
-                              icono: Icons.storefront_outlined,
-                            )
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              itemCount: _resultados.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, i) => _LocalCard(local: _resultados[i]),
-                            ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   String _resumenFiltros() {
-    if (!_filtros.activos) return 'Buscar salón, uñas, spa, barbería...';
+    if (!_filtros.activos) return '¿Qué quieres hacerte? Barbería, uñas, estética...';
     final partes = <String>[];
-    if (_filtros.vertical != null) partes.add(etiquetaVertical(_filtros.vertical!));
+    if (_filtros.rubro != null) partes.add(etiquetaRubro(_filtros.rubro!));
     if (_filtros.abiertoAhora) partes.add('Abierto ahora');
     if (_filtros.soloDisponibles) partes.add('Disponible hoy');
     if (_filtros.amenidades.isNotEmpty) partes.add('${_filtros.amenidades.length} amenidades');
     return partes.isEmpty ? 'Filtros aplicados' : partes.join(' · ');
+  }
+
+  IconData _iconoRubro(String rubro) => switch (rubro) {
+        'barberia' => Icons.content_cut,
+        'estetica' => Icons.face_retouching_natural,
+        'unas' => Icons.brush_outlined,
+        _ => Icons.spa_outlined,
+      };
+}
+
+class _CategoriaCirculo extends StatelessWidget {
+  final String etiqueta;
+  final IconData icono;
+  final bool activo;
+  final VoidCallback onTap;
+
+  const _CategoriaCirculo({required this.etiqueta, required this.icono, required this.activo, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(32),
+        child: SizedBox(
+          width: 60,
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: activo ? scheme.primary : scheme.primaryContainer,
+                ),
+                child: Icon(icono, color: activo ? scheme.onPrimary : scheme.primary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                etiqueta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: activo ? scheme.primary : scheme.onSurface,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -203,6 +270,7 @@ class _LocalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -213,75 +281,63 @@ class _LocalCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 84,
+                  height: 120,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [scheme.primary.withValues(alpha: 0.28), scheme.surfaceContainerHigh],
+                      colors: [scheme.primaryContainer, scheme.surfaceContainerHigh],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                   ),
                   child: Center(
-                    child: Icon(Icons.storefront_outlined, size: 30, color: scheme.onSurface.withValues(alpha: 0.5)),
+                    child: Icon(Icons.storefront_outlined, size: 36, color: scheme.primary.withValues(alpha: 0.5)),
                   ),
                 ),
                 if (local.verificado)
                   Positioned(
                     top: 10,
                     left: 10,
-                    child: StatusBadge(icono: Icons.verified, texto: 'Verificado', color: scheme.primary),
+                    child: StatusBadge(icono: Icons.verified, texto: 'Verificado', color: scheme.tertiary),
                   ),
-                Positioned(
-                  bottom: 10,
-                  right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerLowest.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star_rounded, size: 14, color: scheme.primary),
-                        const SizedBox(width: 3),
-                        Text(
-                          local.scoreRanking > 0 ? local.scoreRanking.toStringAsFixed(1) : 'Nuevo',
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(local.nombre, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    local.direccion,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.near_me_outlined, size: 14, color: scheme.tertiary),
-                      const SizedBox(width: 4),
-                      Text(AppFormatters.distancia(local.distanciaM), style: Theme.of(context).textTheme.labelSmall),
-                      const Spacer(),
+                      Expanded(child: Text(local.nombre, style: textTheme.titleMedium)),
+                      const Icon(Icons.star_rounded, size: 16, color: AppColors.estrella),
+                      const SizedBox(width: 3),
                       Text(
-                        'Ver perfil',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(color: scheme.primary),
+                        local.scoreRanking > 0 ? local.scoreRanking.toStringAsFixed(1) : 'Nuevo',
+                        style: textTheme.labelMedium,
                       ),
-                      Icon(Icons.chevron_right, size: 16, color: scheme.primary),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 14, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          '${AppFormatters.distancia(local.distanciaM)} · ${local.direccion}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => context.push('/local/${local.id}'),
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(42)),
+                    child: const Text('Ver disponibilidad'),
                   ),
                 ],
               ),

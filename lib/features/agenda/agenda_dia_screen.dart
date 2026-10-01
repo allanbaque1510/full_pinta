@@ -17,12 +17,10 @@ const _diasCortos = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 /// Agenda del local (§6): la vista que hace que el local registre TODO ahí
 /// —incluidos walk-ins— o la disponibilidad que ve el cliente miente.
 ///
-/// Nota para el backend (ver `context/plan-implementacion.md`): `GET
-/// /auth/contexto` no expone el `profesional_id` de un contexto
-/// `tipo: "profesional"` — solo `local_id`/`rol`. Sin eso, esta pantalla no
-/// puede filtrar la agenda a "solo lo mío" para ese contexto y por ahora
-/// muestra la agenda completa del local igual que al staff. Si se agrega
-/// `profesional_id` a esa respuesta, acá se puede pasar como filtro.
+/// Vista de staff del negocio (propietario/admin/recepción). El contexto
+/// `profesional` NO debe usar esta pantalla: tiene su propia agenda en
+/// `MiAgendaProfesionalScreen` (`GET /mis-citas-profesional`). El parámetro
+/// `profesionalPropioId` queda solo como filtro opcional.
 ///
 /// Tampoco `Cita` trae el nombre del cliente ni el de cada servicio — se
 /// muestra el teléfono cuando ya es visible (§3.3) y los servicios se

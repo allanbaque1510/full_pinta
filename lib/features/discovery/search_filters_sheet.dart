@@ -4,7 +4,7 @@ import '../../core/widgets/multi_select_chips.dart';
 import '../../data/models/catalog_models.dart';
 
 class SearchFilters {
-  final String? vertical;
+  final String? rubro;
   final double? precioMin;
   final double? precioMax;
   final Set<String> amenidades;
@@ -12,7 +12,7 @@ class SearchFilters {
   final bool abiertoAhora;
 
   const SearchFilters({
-    this.vertical,
+    this.rubro,
     this.precioMin,
     this.precioMax,
     this.amenidades = const {},
@@ -21,7 +21,7 @@ class SearchFilters {
   });
 
   bool get activos =>
-      vertical != null ||
+      rubro != null ||
       precioMin != null ||
       precioMax != null ||
       amenidades.isNotEmpty ||
@@ -29,8 +29,8 @@ class SearchFilters {
       abiertoAhora;
 
   SearchFilters copyWith({
-    String? vertical,
-    bool limpiarVertical = false,
+    String? rubro,
+    bool limpiarRubro = false,
     double? precioMin,
     double? precioMax,
     Set<String>? amenidades,
@@ -38,7 +38,7 @@ class SearchFilters {
     bool? abiertoAhora,
   }) =>
       SearchFilters(
-        vertical: limpiarVertical ? null : (vertical ?? this.vertical),
+        rubro: limpiarRubro ? null : (rubro ?? this.rubro),
         precioMin: precioMin ?? this.precioMin,
         precioMax: precioMax ?? this.precioMax,
         amenidades: amenidades ?? this.amenidades,
@@ -75,21 +75,21 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
             children: [
               Text('Filtros', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
-              Text('Vertical', style: Theme.of(context).textTheme.labelLarge),
+              Text('Rubro', style: Theme.of(context).textTheme.labelLarge),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 children: [
                   ChoiceChip(
                     label: const Text('Todas'),
-                    selected: _filtros.vertical == null,
-                    onSelected: (_) => setState(() => _filtros = _filtros.copyWith(limpiarVertical: true)),
+                    selected: _filtros.rubro == null,
+                    onSelected: (_) => setState(() => _filtros = _filtros.copyWith(limpiarRubro: true)),
                   ),
-                  ...verticalesDisponibles.where((v) => v != 'mascotas').map(
+                  ...rubrosDisponibles.where((v) => v != 'mascotas').map(
                         (v) => ChoiceChip(
-                          label: Text(etiquetaVertical(v)),
-                          selected: _filtros.vertical == v,
-                          onSelected: (_) => setState(() => _filtros = _filtros.copyWith(vertical: v)),
+                          label: Text(etiquetaRubro(v)),
+                          selected: _filtros.rubro == v,
+                          onSelected: (_) => setState(() => _filtros = _filtros.copyWith(rubro: v)),
                         ),
                       ),
                 ],

@@ -47,13 +47,15 @@ class _LocalProductosScreenState extends ConsumerState<LocalProductosScreen> {
       context,
       title: 'Nuevo producto',
       child: _ProductoForm(
-        onGuardar: (nombre, precio, comision) async {
+        onGuardar: (nombre, precio, comision, descripcion, fotoUrl) async {
           try {
             await ref.read(catalogRepositoryProvider).crearProducto(
                   widget.localId,
                   nombre: nombre,
                   precio: precio,
                   comisionPct: comision,
+                  descripcion: descripcion,
+                  fotoUrl: fotoUrl,
                 );
             if (mounted) Navigator.of(context).pop();
             _cargar();
@@ -76,6 +78,12 @@ class _LocalProductosScreenState extends ConsumerState<LocalProductosScreen> {
     }
   }
 
+  String _subtitulo(Producto p) {
+    final base = '${AppFormatters.dinero(p.precio)} · comisión ${p.comisionPct}%';
+    final desc = p.descripcion;
+    return desc == null || desc.isEmpty ? base : '$base · $desc';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListScaffold<Producto>(
@@ -89,7 +97,7 @@ class _LocalProductosScreenState extends ConsumerState<LocalProductosScreen> {
       itemBuilder: (context, p) => CrudTile(
         icono: Icons.shopping_bag_outlined,
         titulo: '${p.nombre}${p.activo ? '' : ' (inactivo)'}',
-        subtitulo: '${AppFormatters.dinero(p.precio)} · comisión ${p.comisionPct}%',
+        subtitulo: _subtitulo(p),
         onEliminar: p.activo ? () => _eliminar(p) : null,
       ),
     );
@@ -97,7 +105,13 @@ class _LocalProductosScreenState extends ConsumerState<LocalProductosScreen> {
 }
 
 class _ProductoForm extends StatefulWidget {
-  final Future<void> Function(String nombre, double precio, double comisionPct) onGuardar;
+  final Future<void> Function(
+    String nombre,
+    double precio,
+    double comisionPct,
+    String descripcion,
+    String fotoUrl,
+  ) onGuardar;
 
   const _ProductoForm({required this.onGuardar});
 
@@ -110,6 +124,8 @@ class _ProductoFormState extends State<_ProductoForm> {
   final _nombreCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
   final _comisionCtrl = TextEditingController(text: '15');
+  final _descripcionCtrl = TextEditingController();
+  final _fotoUrlCtrl = TextEditingController();
   bool _comisionable = false;
 
   @override
@@ -126,6 +142,8 @@ class _ProductoFormState extends State<_ProductoForm> {
     _nombreCtrl.dispose();
     _precioCtrl.dispose();
     _comisionCtrl.dispose();
+    _descripcionCtrl.dispose();
+    _fotoUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -149,6 +167,21 @@ class _ProductoFormState extends State<_ProductoForm> {
             controller: _nombreCtrl,
             decoration: const InputDecoration(labelText: 'Nombre'),
             validator: (v) => AppValidators.requerido(v, 'El nombre'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _descripcionCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _fotoUrlCtrl,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(labelText: 'URL de la foto (opcional)'),
+            validator: (v) => (v == null || v.trim().isEmpty || Uri.tryParse(v.trim())?.hasScheme == true)
+                ? null
+                : 'Ingresa una URL válida',
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -203,6 +236,8 @@ class _ProductoFormState extends State<_ProductoForm> {
               _nombreCtrl.text.trim(),
               double.parse(_precioCtrl.text.replaceAll(',', '.')),
               double.tryParse(_comisionCtrl.text.replaceAll(',', '.')) ?? 0,
+              _descripcionCtrl.text.trim(),
+              _fotoUrlCtrl.text.trim(),
             ),
           ),
         ],

@@ -11,8 +11,15 @@ import '../../features/account/favoritos_screen.dart';
 import '../../features/account/preferencias_notificacion_screen.dart';
 import '../../features/agenda/agenda_dia_screen.dart';
 import '../../features/agenda/cita_staff_detalle_screen.dart';
+import '../../features/agenda/clientes_local_screen.dart';
+import '../../features/agenda/ficha_cliente_screen.dart';
+import '../../features/agenda/mis_liquidaciones_screen.dart';
 import '../../features/agenda/walk_in_form_screen.dart';
 import '../../features/auth/context_selector_screen.dart';
+import '../../features/account/cambiar_contrasena_screen.dart';
+import '../../features/account/editar_perfil_screen.dart';
+import '../../features/account/verificar_email_screen.dart';
+import '../../features/auth/olvide_contrasena_screen.dart';
 import '../../features/auth/email_login_screen.dart';
 import '../../features/auth/email_registro_screen.dart';
 import '../../features/auth/otp_solicitar_screen.dart';
@@ -31,6 +38,8 @@ import '../../features/business/local_productos_screen.dart';
 import '../../features/business/local_servicios_screen.dart';
 import '../../features/business/negocio_detalle_screen.dart';
 import '../../features/business/negocio_form_screen.dart';
+import '../../features/business/negocios_home_screen.dart';
+import '../../features/business/negocio_miembros_screen.dart';
 import '../../features/business/solicitudes_catalogo_screen.dart';
 import '../../features/discovery/local_perfil_publico_screen.dart';
 import '../../features/discovery/profesional_perfil_publico_screen.dart';
@@ -89,6 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => OtpVerificarScreen(telefono: state.extra as String),
       ),
       GoRoute(path: '/login/correo', builder: (context, state) => const EmailLoginScreen()),
+      GoRoute(path: '/login/olvide', builder: (context, state) => const OlvideContrasenaScreen()),
       GoRoute(path: '/registro/correo', builder: (context, state) => const EmailRegistroScreen()),
       GoRoute(path: '/contexto', builder: (context, state) => const ContextSelectorScreen()),
       GoRoute(path: '/', builder: (context, state) => const HomeShell()),
@@ -124,6 +134,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Cuenta
       GoRoute(path: '/cuenta', builder: (context, state) => const AccountHomeScreen()),
       GoRoute(path: '/cuenta/consentimientos', builder: (context, state) => const ConsentimientosScreen()),
+      GoRoute(path: '/cuenta/perfil', builder: (context, state) => const EditarPerfilScreen()),
+      GoRoute(path: '/cuenta/contrasena', builder: (context, state) => const CambiarContrasenaScreen()),
+      GoRoute(path: '/cuenta/verificar-email', builder: (context, state) => const VerificarEmailScreen()),
       GoRoute(path: '/cuenta/eliminar', builder: (context, state) => const EliminarCuentaScreen()),
       GoRoute(
         path: '/cuenta/notificaciones',
@@ -131,6 +144,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // Negocio
+      GoRoute(path: '/negocios', builder: (context, state) => const NegociosHomeScreen()),
       GoRoute(path: '/negocios/nuevo', builder: (context, state) => const NegocioFormScreen()),
       GoRoute(
         path: '/negocios/:negocioId',
@@ -141,7 +155,32 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => LocalFormScreen(negocioId: state.pathParameters['negocioId']!),
       ),
 
+      GoRoute(
+        path: '/negocios/:negocioId/miembros',
+        builder: (context, state) => NegocioMiembrosScreen(negocioId: state.pathParameters['negocioId']!),
+      ),
+
       // Administración del local
+      GoRoute(
+        path: '/locales/:localId/editar',
+        builder: (context, state) {
+          final local = state.extra as Local;
+          return LocalFormScreen(negocioId: local.negocioId, local: local);
+        },
+      ),
+      GoRoute(
+        path: '/locales/:localId/clientes',
+        builder: (context, state) => ClientesLocalScreen(state.pathParameters['localId']!),
+      ),
+      GoRoute(
+        path: '/locales/:localId/clientes/:usuarioId',
+        builder: (context, state) => FichaClienteScreen(
+          localId: state.pathParameters['localId']!,
+          usuarioId: state.pathParameters['usuarioId']!,
+          clienteNombre: state.extra as String?,
+        ),
+      ),
+      GoRoute(path: '/mis-liquidaciones', builder: (context, state) => const MisLiquidacionesScreen()),
       GoRoute(
         path: '/locales/:localId/admin',
         builder: (context, state) => LocalAdminScreen(localId: state.pathParameters['localId']!),

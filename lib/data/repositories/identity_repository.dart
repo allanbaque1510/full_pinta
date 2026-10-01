@@ -11,6 +11,70 @@ class IdentityRepository {
 
   IdentityRepository({Dio? dio}) : _dio = dio ?? DioClient.instance;
 
+  Future<List<FinalidadConsentimiento>> obtenerFinalidades() async {
+    try {
+      final res = await _dio.get('/finalidades-consentimiento');
+      return (res.data as List<dynamic>)
+          .map((e) => FinalidadConsentimiento.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  Future<void> cambiarContrasena({required String actual, required String nueva}) async {
+    try {
+      await _dio.put('/cuenta/contrasena', data: {'actual': actual, 'nueva': nueva});
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  Future<int> solicitarVerificacionEmail() async {
+    try {
+      final res = await _dio.post('/cuenta/email/solicitar-verificacion');
+      return (res.data['expira_en_minutos'] as int?) ?? 5;
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// Devuelve el usuario actualizado y lo persiste en SecureStorage.
+  Future<Usuario> verificarEmail(String codigo) async {
+    try {
+      final res = await _dio.post('/cuenta/email/verificar', data: {'codigo': codigo});
+      final usuario = Usuario.fromJson(res.data as Map<String, dynamic>);
+      await SecureStorage.guardarUsuario(usuario);
+      return usuario;
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// PATCH parcial: solo se manda lo recibido. `quitarFoto` envía
+  /// `foto_url: null`.
+  Future<Usuario> actualizarPerfil({
+    String? nombre,
+    String? genero,
+    String? fechaNacimiento,
+    String? fotoUrl,
+    bool quitarFoto = false,
+  }) async {
+    try {
+      final res = await _dio.patch('/cuenta/perfil', data: {
+        if (nombre != null) 'nombre': nombre,
+        if (genero != null) 'genero': genero,
+        if (fechaNacimiento != null) 'fecha_nacimiento': fechaNacimiento,
+        if (quitarFoto) 'foto_url': null else if (fotoUrl != null) 'foto_url': fotoUrl,
+      });
+      final usuario = Usuario.fromJson(res.data as Map<String, dynamic>);
+      await SecureStorage.guardarUsuario(usuario);
+      return usuario;
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
   Future<List<Consentimiento>> obtenerConsentimientos() async {
     try {
       final res = await _dio.get('/consentimientos');

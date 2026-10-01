@@ -10,10 +10,10 @@ class CatalogRepository {
 
   // ---- Catálogo maestro (público) ----
 
-  Future<List<CategoriaServicio>> categorias({String? vertical}) async {
+  Future<List<CategoriaServicio>> categorias({String? rubro}) async {
     try {
       final res = await _dio.get('/catalogo/categorias', queryParameters: {
-        if (vertical != null) 'vertical': vertical,
+        if (rubro != null) 'rubro': rubro,
       });
       return (res.data as List<dynamic>)
           .map((e) => CategoriaServicio.fromJson(e as Map<String, dynamic>))
@@ -23,10 +23,10 @@ class CatalogRepository {
     }
   }
 
-  Future<List<CatalogoServicio>> servicios({String? vertical, String? categoria}) async {
+  Future<List<CatalogoServicio>> servicios({String? rubro, String? categoria}) async {
     try {
       final res = await _dio.get('/catalogo/servicios', queryParameters: {
-        if (vertical != null) 'vertical': vertical,
+        if (rubro != null) 'rubro': rubro,
         if (categoria != null) 'categoria': categoria,
       });
       return (res.data as List<dynamic>)
@@ -120,9 +120,13 @@ class CatalogRepository {
     required String nombre,
     required double precio,
     double comisionPct = 0,
+    String? descripcion,
+    String? fotoUrl,
   }) async {
     try {
       final res = await _dio.post('/locales/$localId/productos', data: {
+        if (descripcion != null && descripcion.isNotEmpty) 'descripcion': descripcion,
+        if (fotoUrl != null && fotoUrl.isNotEmpty) 'foto_url': fotoUrl,
         'nombre': nombre,
         'precio': precio,
         'comision_pct': comisionPct,
@@ -138,9 +142,13 @@ class CatalogRepository {
     String? nombre,
     double? precio,
     double? comisionPct,
+    String? descripcion,
+    String? fotoUrl,
   }) async {
     try {
       final res = await _dio.patch('/productos/$productoId', data: {
+        if (descripcion != null) 'descripcion': descripcion,
+        if (fotoUrl != null && fotoUrl.isNotEmpty) 'foto_url': fotoUrl,
         if (nombre != null) 'nombre': nombre,
         if (precio != null) 'precio': precio,
         if (comisionPct != null) 'comision_pct': comisionPct,
@@ -174,13 +182,13 @@ class CatalogRepository {
 
   Future<SolicitudCatalogo> crearSolicitud(
     String localId, {
-    required String vertical,
+    required String rubro,
     required String nombrePropuesto,
     String? descripcion,
   }) async {
     try {
       final res = await _dio.post('/locales/$localId/solicitudes-catalogo', data: {
-        'vertical': vertical,
+        'rubro': rubro,
         'nombre_propuesto': nombrePropuesto,
         if (descripcion != null && descripcion.isNotEmpty) 'descripcion': descripcion,
       });

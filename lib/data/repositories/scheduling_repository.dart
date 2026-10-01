@@ -63,6 +63,62 @@ class SchedulingRepository {
     }
   }
 
+  /// Agenda propia del profesional, de todos sus locales. 403
+  /// `no_es_profesional` si la cuenta no tiene un Profesional vinculado.
+  Future<List<Cita>> misCitasProfesional({String? estado, String? localId}) async {
+    try {
+      final res = await _dio.get('/mis-citas-profesional', queryParameters: {
+        if (estado != null) 'estado': estado,
+        if (localId != null) 'local_id': localId,
+      });
+      return (res.data as List<dynamic>).map((e) => Cita.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  // ---- Ficha del cliente (solo staff) ----
+
+  Future<List<ClienteMes>> clientesDelMes(String localId, {String? mes}) async {
+    try {
+      final res = await _dio.get('/locales/$localId/clientes', queryParameters: {
+        if (mes != null) 'mes': mes,
+      });
+      return (res.data as List<dynamic>).map((e) => ClienteMes.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  Future<FichaCliente> fichaCliente(String localId, String usuarioId) async {
+    try {
+      final res = await _dio.get('/locales/$localId/clientes/$usuarioId');
+      return FichaCliente.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// `PUT`: actualiza solo lo que venga. Para quitar el profesional preferido
+  /// pasa [quitarPreferido] en true (se manda `null` explícito).
+  Future<FichaCliente> actualizarFichaCliente(
+    String localId,
+    String usuarioId, {
+    String? nota,
+    String? profesionalPreferidoId,
+    bool quitarPreferido = false,
+  }) async {
+    try {
+      final res = await _dio.put('/locales/$localId/clientes/$usuarioId', data: {
+        if (nota != null) 'nota': nota,
+        if (profesionalPreferidoId != null || quitarPreferido) 'profesional_preferido_id': profesionalPreferidoId,
+      });
+      return FichaCliente.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
   Future<Cita> crearCita(
     String localId, {
     required String profesionalId,

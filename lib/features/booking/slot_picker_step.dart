@@ -11,10 +11,8 @@ import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_state.dart';
 import '../../core/widgets/photo_carousel.dart';
 import '../../core/widgets/primary_button.dart';
-import '../../core/widgets/star_rating.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/models/scheduling_models.dart';
-import '../../data/models/staffing_models.dart';
 import '../../state/repository_providers.dart';
 import '../../state/session_controller.dart';
 import 'booking_draft.dart';
@@ -42,7 +40,6 @@ class _SlotPickerStepState extends ConsumerState<SlotPickerStep> {
   bool _cargando = true;
   String? _error;
   Map<String, List<SlotDisponible>> _slotsPorProfesional = {};
-  final Map<String, ProfesionalPerfilPublico?> _perfiles = {};
   SlotDisponible? _slotSeleccionado;
 
   @override
@@ -75,16 +72,6 @@ class _SlotPickerStepState extends ConsumerState<SlotPickerStep> {
       final agrupados = <String, List<SlotDisponible>>{};
       for (final s in slots) {
         agrupados.putIfAbsent(s.profesionalId, () => []).add(s);
-      }
-
-      final staffing = ref.read(staffingRepositoryProvider);
-      for (final profesionalId in agrupados.keys) {
-        if (_perfiles.containsKey(profesionalId)) continue;
-        try {
-          _perfiles[profesionalId] = await staffing.perfilPublicoProfesional(profesionalId);
-        } catch (_) {
-          _perfiles[profesionalId] = null;
-        }
       }
 
       if (!mounted) return;
@@ -183,7 +170,6 @@ class _SlotPickerStepState extends ConsumerState<SlotPickerStep> {
                             children: [
                               ..._slotsPorProfesional.entries.map((entry) {
                                 final slots = entry.value..sort((a, b) => a.inicio.compareTo(b.inicio));
-                                final perfil = _perfiles[entry.key];
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: SurfaceCard(
@@ -192,34 +178,19 @@ class _SlotPickerStepState extends ConsumerState<SlotPickerStep> {
                                       children: [
                                         Row(
                                           children: [
-                                            NetworkAvatar(url: perfil?.fotoUrl, radio: 20),
+                                            NetworkAvatar(url: slots.first.profesionalFotoUrl, radio: 20),
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    perfil?.alias ?? perfil?.nombre ?? 'Profesional disponible',
+                                                    slots.first.profesionalAlias ?? slots.first.profesionalNombre ?? 'Profesional disponible',
                                                     style: Theme.of(context).textTheme.titleSmall,
                                                   ),
-                                                  if (perfil?.bio != null && perfil!.bio!.isNotEmpty)
-                                                    Text(
-                                                      perfil.bio!,
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                                                    ),
                                                 ],
                                               ),
                                             ),
-                                            if (perfil != null && perfil.resenas.total > 0) ...[
-                                              StarRatingView(puntaje: perfil.resenas.promedio, tamano: 13),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                perfil.resenas.promedio.toStringAsFixed(1),
-                                                style: Theme.of(context).textTheme.labelSmall,
-                                              ),
-                                            ],
                                           ],
                                         ),
                                         const SizedBox(height: 10),

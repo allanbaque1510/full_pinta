@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/fullpinta_wordmark.dart';
+
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -10,7 +12,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset('assets/branding/logo.png', width: 120, height: 120),
+            const FullPintaWordmark(tamano: 44),
             const SizedBox(height: 24),
             const CircularProgressIndicator(),
           ],

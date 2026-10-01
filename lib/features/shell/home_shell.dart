@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/identity_models.dart';
 import '../../state/session_controller.dart';
 import '../account/account_home_screen.dart';
+import '../account/favoritos_screen.dart';
 import '../agenda/agenda_dia_screen.dart';
 import '../booking/mis_citas_screen.dart';
 import '../business/negocios_home_screen.dart';
 import '../discovery/search_home_screen.dart';
-import '../reviews_staff/local_resenas_screen.dart';
+import '../agenda/clientes_local_screen.dart';
+import '../agenda/mi_agenda_profesional_screen.dart';
 
 /// Cascarón con navegación inferior. Las pestañas cambian según el
 /// contexto activo (§3.2): cliente, negocio o profesional. El selector de
@@ -49,7 +51,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         selectedIndex: _indice,
         onDestinationSelected: (i) => setState(() => _indice = i),
         destinations: tabs
-            .map((t) => NavigationDestination(icon: Icon(t.icono), label: t.etiqueta))
+            .map((t) => NavigationDestination(
+                  icon: Icon(t.icono),
+                  selectedIcon: Icon(t.iconoActivo ?? t.icono),
+                  label: t.etiqueta,
+                ))
             .toList(),
       ),
     );
@@ -58,31 +64,32 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   List<_Tab> _tabsPara(ContextoActivo contexto) {
     if (contexto.esNegocio) {
       return [
-        _Tab('Negocios', Icons.storefront_outlined, const NegociosHomeScreen()),
+        _Tab('Inicio', Icons.home_outlined, const NegociosHomeScreen(), iconoActivo: Icons.home),
         if (contexto.localId != null)
           _Tab('Agenda', Icons.event_note_outlined, AgendaDiaScreen(localId: contexto.localId!))
         else
           _Tab('Agenda', Icons.event_note_outlined, const _SeleccionaLocalPlaceholder()),
         if (contexto.localId != null)
-          _Tab('Reseñas', Icons.star_outline, LocalResenasScreen(localId: contexto.localId!))
+          _Tab('Clientes', Icons.people_outline, ClientesLocalScreen(contexto.localId!), iconoActivo: Icons.people)
         else
-          _Tab('Reseñas', Icons.star_outline, const _SeleccionaLocalPlaceholder()),
-        const _Tab('Cuenta', Icons.person_outline, AccountHomeScreen()),
+          _Tab('Clientes', Icons.people_outline, const _SeleccionaLocalPlaceholder()),
+        const _Tab('Más', Icons.menu, AccountHomeScreen()),
       ];
     }
 
     if (contexto.esProfesional && contexto.localId != null) {
       return [
         _Tab('Mi agenda', Icons.event_note_outlined,
-            AgendaDiaScreen(localId: contexto.localId!, profesionalPropioId: null)),
+            const MiAgendaProfesionalScreen()),
         const _Tab('Cuenta', Icons.person_outline, AccountHomeScreen()),
       ];
     }
 
     return const [
-      _Tab('Buscar', Icons.search, SearchHomeScreen()),
-      _Tab('Mis citas', Icons.event_available_outlined, MisCitasScreen()),
-      _Tab('Cuenta', Icons.person_outline, AccountHomeScreen()),
+      _Tab('Explorar', Icons.search, SearchHomeScreen()),
+      _Tab('Favoritos', Icons.favorite_border, FavoritosScreen(), iconoActivo: Icons.favorite),
+      _Tab('Mis citas', Icons.calendar_today_outlined, MisCitasScreen(), iconoActivo: Icons.calendar_today),
+      _Tab('Perfil', Icons.person_outline, AccountHomeScreen(), iconoActivo: Icons.person),
     ];
   }
 }
@@ -91,8 +98,9 @@ class _Tab {
   final String etiqueta;
   final IconData icono;
   final Widget pantalla;
+  final IconData? iconoActivo;
 
-  const _Tab(this.etiqueta, this.icono, this.pantalla);
+  const _Tab(this.etiqueta, this.icono, this.pantalla, {this.iconoActivo});
 }
 
 class _SeleccionaLocalPlaceholder extends StatelessWidget {

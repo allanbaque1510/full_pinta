@@ -48,3 +48,5 @@ app.*.map.json
 # Nunca se commitea: cada desarrollador copia dart_defines.example.json -> dart_defines.json
 # con sus propios valores. Ver README.md, sección "Configuración de entorno".
 dart_defines.json
+# Widget Preview related
+.widget_preview/

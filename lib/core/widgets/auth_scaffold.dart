@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'fullpinta_wordmark.dart';
 
 /// Cascarón compartido por las pantallas de autenticación (OTP, correo,
 /// registro): header con back button, logo pequeño + título, hero con el
@@ -29,9 +30,7 @@ class AuthScaffold extends StatelessWidget {
       appBar: AppBar(
         title: Row(
           children: [
-            Image.asset('assets/branding/logo.png', width: 24, height: 24),
-            const SizedBox(width: 8),
-            Text(tituloHeader),
+            const FullPintaWordmark(tamano: 22),
           ],
         ),
       ),
@@ -44,19 +43,7 @@ class AuthScaffold extends StatelessWidget {
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: scheme.primary.withValues(alpha: 0.12), blurRadius: 24, spreadRadius: 4),
-                        ],
-                      ),
-                      child: Image.asset('assets/branding/logo.png'),
-                    ),
+                    const FullPintaWordmark(tamano: 38),
                     const SizedBox(height: 16),
                     if (etiquetaSuperior != null) ...[
                       Text(

@@ -76,3 +76,26 @@ Ninguno de estos puntos es una inconsistencia del backend respecto a lo document
 - **Sin pruebas manuales de UI en dispositivo/emulador todavía en esta sesión** — se validó compilación (`analyze`, `build web`, `test`) pero no se ejecutó `flutter run` contra el backend real. Antes de dar por cerrado un flujo (ej. "agendar funciona"), correrlo de punta a punta con el backend levantado.
 - **Build de Windows desktop**: la primera vez que se corrió `flutter pub get` en este entorno, Windows avisó que "building with plugins requires symlink support" y pidió activar el Modo de desarrollador (`start ms-settings:developers`). No bloqueó `flutter build web`, pero si se va a correr `-d windows`, hay que activarlo primero.
 - **Sigue el patrón de `.claude/skills/flutter-convenciones/SKILL.md`** al agregar pantallas nuevas — la mayoría de los CRUD de negocio/staff son variaciones del mismo patrón (`ListScaffold` + `showAppFormSheet`), copiar la forma existente es más rápido y más consistente que escribir una desde cero.
+
+---
+
+## 5. Actualización 2026-10-01 — mockup oficial y cambios de contrato
+
+### Diseño (fuente: `context/Image.jpg`)
+- Tema **claro** con acento frambuesa (`AppColors.primario`), verde de disponibilidad, estrellas amarillas; paleta estimada a ojo desde la imagen, a confirmar con los hex oficiales de diseño. Todo en `lib/core/theme/app_theme.dart`. El oscuro queda solo como respaldo (`ThemeMode.light` forzado en `app.dart`).
+- Logo en texto (`FullPintaWordmark`); el PNG naranja de `assets/branding/` ya no se usa en la UI.
+- Navegación: cliente = Explorar · Favoritos · Mis citas · Perfil; negocio = Inicio · Agenda · Clientes · Más; profesional = Mi agenda · Cuenta.
+- Inicio rediseñado (búsqueda, categorías en círculos, tarjetas de locales) y perfil del local con profesionales y productos.
+
+### Contrato (especificación + `api-referencia.md`)
+- `vertical` → `rubro`; `/fotos` → `/imagenes` (tipos `fachada|interior|muestra`); sin `independiente`; `metodo_pago_id`; reportes con `objeto_type`.
+- Identity: `email_verificado`, `genero`, `fecha_nacimiento`; recuperar y cambiar contraseña; verificar correo; editar perfil; consentimientos desde `GET /finalidades-consentimiento`.
+- Negocio/staff: miembros del negocio, vincular cuenta de profesional, `GET /mis-citas-profesional`, liquidaciones propias, ficha y bandeja de clientes, parámetros de reserva del local, productos con descripción/foto, insignia de RUC verificado.
+- Disponibilidad: el slot ya trae nombre/alias/foto del profesional (se eliminó la consulta por profesional).
+
+### Pendiente / huecos
+- `GET /auth/contexto` no trae `profesional_id`: `MisLiquidacionesScreen` no puede cargar sola hasta que el backend lo incluya (ruta `/mis-liquidaciones`, aún sin enlace desde Cuenta).
+- Las citas no traen nombre del cliente ni de los servicios (la agenda del profesional muestra teléfono y "N servicios").
+- Las tarjetas de búsqueda no muestran horas libres: la API de búsqueda no las devuelve.
+- Subida real de imágenes, login con Google y mascotas siguen fuera, como antes.
+- No se probó contra el backend ni en dispositivo: solo `flutter analyze` (0 errores) y el smoke test.

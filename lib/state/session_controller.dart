@@ -66,6 +66,12 @@ class SessionController extends StateNotifier<SessionState> {
     await _resolverContexto();
   }
 
+  /// Reemplaza el usuario en sesión (perfil editado, email verificado...).
+  /// Los repositorios ya lo persistieron en SecureStorage.
+  void usuarioActualizado(Usuario usuario) {
+    state = state.copyWith(usuario: usuario);
+  }
+
   Future<void> _resolverContexto() async {
     state = state.copyWith(status: SessionStatus.cargando);
     try {
@@ -121,12 +127,15 @@ class SessionController extends StateNotifier<SessionState> {
   /// Vuelve a pedir `GET /auth/contexto` sin tocar el status ni el contexto
   /// activo — se usa después de crear un negocio o de que a alguien le den
   /// una nueva asignación, para que aparezca sin reiniciar la app.
-  Future<void> refrescarContextoAcceso() async {
+  /// Devuelve `false` si la consulta falló, para que quien la llama avise al
+  /// usuario en vez de dejar la lista de negocios vacía sin explicación.
+  Future<bool> refrescarContextoAcceso() async {
     try {
       final contexto = await _authRepository.obtenerContexto();
       state = state.copyWith(contextoAcceso: contexto);
+      return true;
     } catch (_) {
-      // Silencioso: no es crítico, el usuario lo ve la próxima vez que entre.
+      return false;
     }
   }
 

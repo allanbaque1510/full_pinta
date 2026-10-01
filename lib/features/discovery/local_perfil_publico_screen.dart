@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/color_dot.dart';
 import '../../core/widgets/error_state.dart';
@@ -160,6 +161,26 @@ class _LocalPerfilPublicoScreenState extends ConsumerState<LocalPerfilPublicoScr
                   Text('Servicios', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 10),
                   ...local.servicios.where((s) => s.activo).map((s) => _ServicioCard(servicio: s)),
+                  if (local.profesionales.isNotEmpty) ...[
+                    const Divider(height: 32),
+                    Text('Profesionales', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 104,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: local.profesionales
+                            .map((p) => _ProfesionalChip(profesional: p))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                  if (local.productos.isNotEmpty) ...[
+                    const Divider(height: 32),
+                    Text('Productos', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 10),
+                    ...local.productos.where((p) => p.activo).map((p) => _ProductoTile(producto: p)),
+                  ],
                   if (local.amenidades.isNotEmpty) ...[
                     const Divider(height: 32),
                     Text('Amenidades', style: Theme.of(context).textTheme.headlineSmall),
@@ -313,6 +334,103 @@ class _ServicioCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Un profesional del roster: toca para ver su portafolio (§4.6, "elegir
+/// barbero viendo cortes").
+class _ProfesionalChip extends StatelessWidget {
+  final ProfesionalResumen profesional;
+
+  const _ProfesionalChip({required this.profesional});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/profesional/${profesional.id}'),
+        child: SizedBox(
+          width: 76,
+          child: Column(
+            children: [
+              NetworkAvatar(url: profesional.fotoUrl, radio: 30),
+              const SizedBox(height: 6),
+              Text(
+                profesional.nombreVisible,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium,
+              ),
+              if (profesional.resenasPromedio > 0)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 12, color: AppColors.estrella),
+                    const SizedBox(width: 2),
+                    Text(profesional.resenasPromedio.toStringAsFixed(1), style: textTheme.labelSmall),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Producto en exhibición (solo informativo, sin compra — §4.5).
+class _ProductoTile extends StatelessWidget {
+  final Producto producto;
+
+  const _ProductoTile({required this.producto});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SurfaceCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 56,
+                height: 56,
+                color: scheme.primaryContainer,
+                child: producto.fotoUrl != null && producto.fotoUrl!.isNotEmpty
+                    ? Image.network(producto.fotoUrl!, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(Icons.shopping_bag_outlined, color: scheme.primary))
+                    : Icon(Icons.shopping_bag_outlined, color: scheme.primary),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(producto.nombre, style: textTheme.titleSmall),
+                  if (producto.descripcion != null && producto.descripcion!.isNotEmpty)
+                    Text(
+                      producto.descripcion!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
+            ),
+            Text(AppFormatters.dinero(producto.precio),
+                style: textTheme.titleSmall?.copyWith(color: scheme.primary)),
           ],
         ),
       ),

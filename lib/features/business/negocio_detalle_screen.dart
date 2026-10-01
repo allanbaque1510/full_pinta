@@ -60,7 +60,24 @@ class _NegocioDetalleScreenState extends ConsumerState<NegocioDetalleScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(_negocio!.nombreMarca)),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Flexible(child: Text(_negocio!.nombreMarca, overflow: TextOverflow.ellipsis)),
+            if (_negocio!.rucVerificado) ...[
+              const SizedBox(width: 8),
+              const _InsigniaRucVerificado(),
+            ],
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Equipo con acceso',
+            icon: const Icon(Icons.group_outlined),
+            onPressed: () => context.push('/negocios/${widget.negocioId}/miembros'),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _cargar,
         child: _locales.isEmpty
@@ -101,6 +118,33 @@ class _NegocioDetalleScreenState extends ConsumerState<NegocioDetalleScreen> {
         onPressed: () => context.push('/negocios/${widget.negocioId}/locales/nuevo'),
         icon: const Icon(Icons.add),
         label: const Text('Nuevo local'),
+      ),
+    );
+  }
+}
+
+class _InsigniaRucVerificado extends StatelessWidget {
+  const _InsigniaRucVerificado();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified, size: 14, color: scheme.onPrimaryContainer),
+          const SizedBox(width: 4),
+          Text(
+            'RUC verificado',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onPrimaryContainer),
+          ),
+        ],
       ),
     );
   }
