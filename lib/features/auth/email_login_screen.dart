@@ -119,7 +119,14 @@ class _EmailLoginScreenState extends ConsumerState<EmailLoginScreen> {
               ),
               validator: AppValidators.password,
             ),
-            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => context.push('/login/olvide'),
+                child: const Text('¿Olvidaste tu contraseña?'),
+              ),
+            ),
+            const SizedBox(height: 8),
             PrimaryButton(label: 'Entrar', onPressed: _entrar, isLoading: _cargando, icon: Icons.arrow_forward),
             const SizedBox(height: 12),
             TrustRow(items: const [(Icons.verified_user_outlined, 'Conexión cifrada de alta seguridad')]),

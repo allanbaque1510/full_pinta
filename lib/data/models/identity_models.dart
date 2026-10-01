@@ -7,7 +7,10 @@ class Usuario {
   final bool telefonoVerificado;
   final String nombre;
   final String? email;
+  final bool emailVerificado;
   final String? fotoUrl;
+  final String? genero; // m | f | otro | no_decir
+  final String? fechaNacimiento; // yyyy-MM-dd
 
   const Usuario({
     required this.id,
@@ -15,7 +18,10 @@ class Usuario {
     required this.telefonoVerificado,
     required this.nombre,
     this.email,
+    this.emailVerificado = false,
     this.fotoUrl,
+    this.genero,
+    this.fechaNacimiento,
   });
 
   factory Usuario.fromJson(Map<String, dynamic> json) => Usuario(
@@ -24,7 +30,10 @@ class Usuario {
         telefonoVerificado: json['telefono_verificado'] as bool? ?? false,
         nombre: json['nombre'] as String? ?? '',
         email: json['email'] as String?,
+        emailVerificado: json['email_verificado'] as bool? ?? false,
         fotoUrl: json['foto_url'] as String?,
+        genero: json['genero'] as String?,
+        fechaNacimiento: json['fecha_nacimiento'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -33,7 +42,10 @@ class Usuario {
         'telefono_verificado': telefonoVerificado,
         'nombre': nombre,
         'email': email,
+        'email_verificado': emailVerificado,
         'foto_url': fotoUrl,
+        'genero': genero,
+        'fecha_nacimiento': fechaNacimiento,
       };
 }
 
@@ -71,6 +83,10 @@ class ContextoItem {
   final String? localId;
   final String? localNombre;
 
+  /// Hueco del contrato: `GET /auth/contexto` todavía no lo devuelve; se lee
+  /// si el backend lo agrega (`profesional_id`) en contextos de tipo profesional.
+  final String? profesionalId;
+
   const ContextoItem({
     required this.tipo,
     required this.rol,
@@ -78,6 +94,7 @@ class ContextoItem {
     this.negocioNombre,
     this.localId,
     this.localNombre,
+    this.profesionalId,
   });
 
   bool get esNegocio => tipo == 'negocio';
@@ -94,6 +111,7 @@ class ContextoItem {
         negocioNombre: json['negocio_nombre'] as String?,
         localId: json['local_id'] as String?,
         localNombre: json['local_nombre'] as String?,
+        profesionalId: json['profesional_id'] as String?,
       );
 }
 
@@ -107,6 +125,7 @@ class ContextoActivo {
   final String? negocioNombre;
   final String? localId;
   final String? localNombre;
+  final String? profesionalId;
 
   const ContextoActivo({
     required this.tipo,
@@ -115,6 +134,7 @@ class ContextoActivo {
     this.negocioNombre,
     this.localId,
     this.localNombre,
+    this.profesionalId,
   });
 
   static const cliente = ContextoActivo(tipo: 'cliente', rol: 'cliente');
@@ -126,6 +146,7 @@ class ContextoActivo {
         negocioNombre: item.negocioNombre,
         localId: item.localId,
         localNombre: item.localNombre,
+        profesionalId: item.profesionalId,
       );
 
   bool get esCliente => tipo == 'cliente';
@@ -133,35 +154,56 @@ class ContextoActivo {
   bool get esProfesional => tipo == 'profesional';
 }
 
-const _finalidades = [
-  'operacion_servicio',
-  'comunicaciones_transaccionales',
-  'marketing',
-  'transferencia_internacional',
-];
+/// Documento legal vigente asociado a una finalidad (§13.1). En el catálogo
+/// trae `contenido`/`url`; en `GET /consentimientos` solo `tipo` y `version`.
+class DocumentoLegal {
+  final String tipo;
+  final String version;
+  final String? contenido;
+  final String? url;
 
-List<String> get finalidadesConsentimiento => _finalidades;
+  const DocumentoLegal({required this.tipo, required this.version, this.contenido, this.url});
 
-String etiquetaFinalidad(String finalidad) {
-  switch (finalidad) {
-    case 'operacion_servicio':
-      return 'Operar mis citas y reservas';
-    case 'comunicaciones_transaccionales':
-      return 'Comunicaciones sobre mis citas (WhatsApp/push)';
-    case 'marketing':
-      return 'Promociones y novedades';
-    case 'transferencia_internacional':
-      return 'Transferencia internacional de datos (WhatsApp/Firebase)';
-    default:
-      return finalidad;
-  }
+  factory DocumentoLegal.fromJson(Map<String, dynamic> json) => DocumentoLegal(
+        tipo: json['tipo'] as String? ?? '',
+        version: json['version']?.toString() ?? '',
+        contenido: json['contenido'] as String?,
+        url: json['url'] as String?,
+      );
+}
+
+/// Fila de `GET /finalidades-consentimiento` (pública).
+class FinalidadConsentimiento {
+  final String codigo;
+  final String nombre;
+  final String descripcion;
+  final bool obligatorio;
+  final DocumentoLegal? documentoLegal;
+
+  const FinalidadConsentimiento({
+    required this.codigo,
+    required this.nombre,
+    required this.descripcion,
+    required this.obligatorio,
+    this.documentoLegal,
+  });
+
+  factory FinalidadConsentimiento.fromJson(Map<String, dynamic> json) => FinalidadConsentimiento(
+        codigo: json['codigo'] as String,
+        nombre: json['nombre'] as String? ?? json['codigo'] as String,
+        descripcion: json['descripcion'] as String? ?? '',
+        obligatorio: json['obligatorio'] as bool? ?? false,
+        documentoLegal: json['documento_legal'] == null
+            ? null
+            : DocumentoLegal.fromJson(json['documento_legal'] as Map<String, dynamic>),
+      );
 }
 
 class Consentimiento {
   final String finalidad;
   final bool otorgado;
   final bool vigente;
-  final String? documentoVersion;
+  final DocumentoLegal? documentoLegal;
   final DateTime? otorgadoAt;
   final DateTime? revocadoAt;
 
@@ -169,7 +211,7 @@ class Consentimiento {
     required this.finalidad,
     required this.otorgado,
     required this.vigente,
-    this.documentoVersion,
+    this.documentoLegal,
     this.otorgadoAt,
     this.revocadoAt,
   });
@@ -178,7 +220,9 @@ class Consentimiento {
         finalidad: json['finalidad'] as String,
         otorgado: json['otorgado'] as bool? ?? false,
         vigente: json['vigente'] as bool? ?? false,
-        documentoVersion: json['documento_version'] as String?,
+        documentoLegal: json['documento_legal'] == null
+            ? null
+            : DocumentoLegal.fromJson(json['documento_legal'] as Map<String, dynamic>),
         otorgadoAt: json['otorgado_at'] == null ? null : DateTime.tryParse(json['otorgado_at']),
         revocadoAt: json['revocado_at'] == null ? null : DateTime.tryParse(json['revocado_at']),
       );

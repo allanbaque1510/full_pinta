@@ -280,6 +280,21 @@ class _LocalAdminScreenState extends ConsumerState<LocalAdminScreen> {
             onTap: () => context.push('/locales/${local.id}/resenas'),
           ),
           MenuAccessTile(
+            icono: Icons.people_outline,
+            titulo: 'Clientes',
+            subtitulo: 'Recurrencia mensual y ficha de cada cliente',
+            onTap: () => context.push('/locales/${local.id}/clientes'),
+          ),
+          MenuAccessTile(
+            icono: Icons.tune_outlined,
+            titulo: 'Datos y reglas de reserva',
+            subtitulo: 'Anticipación, horizonte y política de cancelación',
+            onTap: () async {
+              await context.push('/locales/${local.id}/editar', extra: local);
+              if (mounted) _cargar();
+            },
+          ),
+          MenuAccessTile(
             icono: Icons.add_shopping_cart_outlined,
             titulo: 'Solicitar servicio nuevo',
             subtitulo: 'Acceso para sugerir nuevas categorías al catálogo',

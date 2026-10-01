@@ -49,7 +49,7 @@ class FavoritoLocal {
     // Si el backend manda el shape completo de perfil-publico, `fotos` trae
     // al menos una entrada con `url` — se toma la primera como miniatura.
     String? primeraFoto;
-    final fotos = json['fotos'];
+    final fotos = json['imagenes'] ?? json['fotos'];
     if (fotos is List && fotos.isNotEmpty && fotos.first is Map) {
       primeraFoto = (fotos.first as Map)['url'] as String?;
     }

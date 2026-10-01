@@ -39,8 +39,11 @@ class _NegocioFormScreenState extends ConsumerState<NegocioFormScreen> {
             nombreMarca: _nombreCtrl.text.trim(),
             ruc: _rucCtrl.text.trim().isEmpty ? null : _rucCtrl.text.trim(),
           );
-      await ref.read(sessionControllerProvider.notifier).refrescarContextoAcceso();
+      final actualizado = await ref.read(sessionControllerProvider.notifier).refrescarContextoAcceso();
       if (!mounted) return;
+      if (!actualizado) {
+        mostrarError(context, 'El negocio se creó, pero no pudimos actualizar tu lista. Cierra sesión y vuelve a entrar para verlo.');
+      }
       context.pushReplacement('/negocios/${negocio.id}');
     } catch (e) {
       if (mounted) mostrarError(context, DioClient.mapearError(e).mensaje);

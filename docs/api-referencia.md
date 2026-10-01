@@ -60,7 +60,8 @@ Verifica el código y devuelve el usuario + token. Público.
 {
   "usuario": {
     "id": "uuid", "telefono": "0991234567", "telefono_verificado": true,
-    "nombre": "Ana Pérez", "email": null, "foto_url": null
+    "nombre": "Ana Pérez", "email": null, "email_verificado": false, "foto_url": null,
+    "genero": null, "fecha_nacimiento": null
   },
   "token": "1|abc123..."
 }
@@ -131,6 +132,48 @@ Público.
 
 Una cuenta creada por OTP o por Google nunca puede entrar por acá a menos que además haya hecho `POST /auth/registro` con ese mismo correo — `password_hash` en esos casos es un hash aleatorio e inutilizable, nunca coincide con ninguna contraseña real.
 
+### Recuperar / cambiar contraseña
+
+Recuperar (sin sesión, se perdió el acceso) admite **dos canales** — el usuario elige al tocar "olvidé mi contraseña". Cambiar (con sesión, se conoce la actual) es un flujo aparte, más simple.
+
+### `POST /auth/contrasena/olvide`
+
+Público. Pide un código de 6 dígitos al canal elegido. Responde igual exista o no una cuenta con ese destino — no revela si un teléfono o correo está registrado.
+
+**Body**: `{ "canal": "whatsapp", "telefono": "0991234567" }` o `{ "canal": "email", "email": "ana@example.com" }` — `telefono` obligatorio si `canal` es `whatsapp`; `email` obligatorio si `canal` es `email`.
+
+**200**
+```json
+{ "mensaje": "Si los datos son válidos, se envió un código.", "expira_en_minutos": 5 }
+```
+
+**Errores**: mismos que `POST /auth/otp/solicitar` (429 `otp_demasiadas_solicitudes` si se piden demasiados códigos para ese destino).
+
+### `POST /auth/contrasena/restablecer`
+
+Público. Verifica el código y fija la contraseña nueva.
+
+**Body**: `{ "canal": "whatsapp", "telefono": "0991234567", "codigo": "482913", "password": "algo-de-8-o-mas" }` (o `email` en vez de `telefono` si `canal` es `email`).
+
+**200**: mismo shape que `POST /auth/otp/verificar` — token nuevo, ya autenticado. Si `canal` es `email`, la respuesta trae `usuario.email_verificado: true` (recibir y escribir el código ya prueba que controla ese correo).
+
+**Todas las sesiones anteriores quedan revocadas** — recuperar el acceso es exactamente el escenario en que no se sabe quién más pudo quedar autenticado.
+
+**Errores**
+| HTTP | Forma | Cuándo |
+|---|---|---|
+| 422 | Validación estándar, campo `codigo` | Código incorrecto, expirado, o el destino no corresponde a ninguna cuenta (mismo mensaje para los tres casos, no se revela cuál) |
+
+### `PUT /cuenta/contrasena` 🔒
+
+Cambia la contraseña conociendo la actual. No revoca ninguna sesión — a diferencia de restablecer, aquí no se perdió el acceso.
+
+**Body**: `{ "actual": "clave-vieja", "nueva": "algo-de-8-o-mas" }`.
+
+**204**, sin cuerpo.
+
+**Errores**: `422` validación estándar, campo `actual`, si no coincide con la contraseña vigente.
+
 ### Verificar el teléfono después de Google o correo
 
 Si la cuenta nació con `telefono_verificado: false`, se verifica con el **mismo** `POST /auth/otp/solicitar` + `POST /auth/otp/verificar` de arriba, usando el teléfono ya registrado — no hace falta (ni existe) un mecanismo de verificación distinto por método. `POST /auth/otp/verificar` reconoce que el teléfono ya tiene cuenta y solo actualiza `telefono_verificado: true`, sin crear una cuenta nueva.
@@ -143,7 +186,6 @@ Con qué "sombreros" puede entrar este usuario — la base del selector de conte
 ```json
 {
   "usuario_id": "uuid",
-  "es_cliente": true,
   "requiere_seleccion": true,
   "contextos": [
     { "tipo": "negocio", "rol": "propietario", "negocio_id": "uuid",
@@ -154,7 +196,7 @@ Con qué "sombreros" puede entrar este usuario — la base del selector de conte
 }
 ```
 
-- `es_cliente` es siempre `true` — no es un contexto seleccionable, toda cuenta puede agendar para sí misma.
+- Cualquier cuenta autenticada puede agendar para sí misma sin necesitar elegir contexto — no aparece como campo porque nunca varía.
 - `requiere_seleccion: false` (0 o 1 contexto) → el front entra directo, sin mostrar el selector.
 - `tipo: "negocio"`: `local_id: null` significa **todos los locales de ese negocio**, no ninguno.
 - `tipo: "profesional"`: el usuario tiene perfil profesional y trabaja en ese `local_id` con ese `rol` (`barbero`, `estilista`, `manicurista`, `groomer`).
@@ -171,6 +213,22 @@ Revoca **solo el token con el que se autenticó esta petición** — no todos lo
 
 ## Identity — Consentimientos y cuenta
 
+### `GET /finalidades-consentimiento`
+
+**Pública, sin autenticación** — el front la necesita para pintar la pantalla de consentimiento antes de que exista ninguna cuenta. Catálogo completo (§13.1), con el documento legal vigente embebido cuando la finalidad tiene uno asignado.
+
+**200**
+```json
+[
+  { "codigo": "operacion_servicio", "nombre": "...", "descripcion": "...",
+    "obligatorio": true, "documento_legal": null },
+  { "codigo": "marketing", "nombre": "...", "descripcion": "...",
+    "obligatorio": false,
+    "documento_legal": { "tipo": "politica_marketing", "version": "2026-01", "contenido": "...", "url": null } }
+]
+```
+`documento_legal` es `null` cuando esa finalidad todavía no tiene un tipo de documento asignado, o el tipo asignado no tiene ninguna versión publicada vigente — ambos casos son válidos (§13.1, la asignación es una decisión legal, no técnica).
+
 ### `GET /consentimientos` 🔒
 
 El estado más reciente de cada finalidad que el usuario tocó alguna vez (§13.1).
@@ -179,12 +237,12 @@ El estado más reciente de cada finalidad que el usuario tocó alguna vez (§13.
 ```json
 [
   { "finalidad": "operacion_servicio", "otorgado": true, "vigente": true,
-    "documento_version": "2026-01", "otorgado_at": "...", "revocado_at": null },
+    "documento_legal": { "tipo": "politica_privacidad", "version": "2026-01" }, "otorgado_at": "...", "revocado_at": null },
   { "finalidad": "marketing", "otorgado": true, "vigente": false,
-    "documento_version": "2026-01", "otorgado_at": "...", "revocado_at": "..." }
+    "documento_legal": null, "otorgado_at": "...", "revocado_at": "..." }
 ]
 ```
-Una finalidad ausente de la lista significa que nunca se le preguntó al usuario por ella.
+Una finalidad ausente de la lista significa que nunca se le preguntó al usuario por ella. `documento_legal` aparece solo si ese otorgamiento quedó asociado a una versión publicada (mismo criterio que arriba).
 
 ### `POST /consentimientos` 🔒
 
@@ -194,15 +252,43 @@ Otorga o revoca una finalidad puntual. **Nunca "aceptar todo" con un solo toque*
 ```json
 { "finalidad": "marketing", "otorgado": true }
 ```
-`finalidad` ∈ `operacion_servicio | comunicaciones_transaccionales | marketing | transferencia_internacional`.
+`finalidad` es el `codigo` de una fila activa de `GET /finalidades-consentimiento` (catálogo, no un enum fijo — puede crecer sin desplegar la app).
 
 **200** — mismo shape que una fila de `GET /consentimientos`. Si se pidió revocar algo que nunca se otorgó, responde `{ "finalidad": "...", "otorgado": false, "vigente": false }` sin error: es idempotente a propósito.
+
+### `PATCH /cuenta/perfil` 🔒
+
+Autogestión del propio perfil. `telefono`/`email` **no se editan por acá** — cada uno tiene su propio flujo de verificación (OTP y `POST /cuenta/email/...` respectivamente).
+
+**Body**: `{ "nombre": "...", "genero": "m|f|otro|no_decir", "fecha_nacimiento": "1995-05-20", "foto_url": "https://..." }` — los cuatro opcionales, se actualiza solo lo que venga. `foto_url: null` quita la foto. `fecha_nacimiento` debe ser anterior a hoy.
+
+**200**: el usuario actualizado (mismo shape que `usuario` en `POST /auth/otp/verificar`).
 
 ### `DELETE /cuenta` 🔒
 
 Derecho de eliminación (§13.1). **No borra la cuenta** — el historial de citas cuelga de ese `usuario_id` y tiene que seguir cuadrando — la anonimiza (teléfono, nombre, email, foto quedan irreconocibles) y revoca todos sus tokens, incluido el que se usó para esta misma petición.
 
 **204**, sin cuerpo. Sin vuelta atrás: no hay endpoint para deshacerlo.
+
+### Verificación de propiedad del email
+
+El `UNIQUE` de `usuario.email` evita duplicados, no prueba que quien lo escribió controla esa bandeja (§13.1) — mismo criterio que `telefono_verificado`, reutilizando el mecanismo de código de un solo uso de `otp`.
+
+### `POST /cuenta/email/solicitar-verificacion` 🔒
+
+Envía un código de 6 dígitos al `email` ya registrado del usuario autenticado.
+
+**200**: mismo shape que `POST /auth/otp/solicitar`.
+
+**Errores**: `422` validación estándar, campo `email`, si la cuenta no tiene correo registrado o si ya está verificado.
+
+### `POST /cuenta/email/verificar` 🔒
+
+**Body**: `{ "codigo": "482913" }`.
+
+**200**: el usuario actualizado (mismo shape que `usuario` en `POST /auth/otp/verificar`), con `email_verificado: true`.
+
+**Errores**: mismos que `POST /auth/otp/verificar` (código incorrecto/expirado).
 
 ---
 
@@ -239,15 +325,47 @@ Un solo endpoint hace de alta y baja: si ya era favorito, lo quita; si no, lo ag
 
 ### `POST /negocios` 🔒
 
-Crea un negocio y convierte a quien lo crea en su propietario (§4.4) — provisiona `negocio_miembro(rol: propietario, local_id: null)` en la misma transacción.
+Crea un negocio y convierte a quien lo crea en su propietario (§4.4) — provisiona `negocio_miembro(rol: propietario, local_id: null)` en la misma transacción. Cualquier cuenta autenticada puede crear el suyo, sin límite de cuántos.
 
 **Body**: `{ "nombre_marca": "Barbería Kevin", "ruc": "1234567890001" }` (`ruc` opcional, 13 dígitos).
 
-**201** — el negocio creado, `plan: "free"` por defecto.
+**201** (mismo shape en `GET`/`PATCH` de abajo):
+```json
+{
+  "id": "uuid", "nombre_marca": "Barbería Kevin", "ruc": "1234567890001",
+  "ruc_verificado": false, "ruc_verificado_at": null,
+  "propietario_id": "uuid", "logo_url": null, "portada_url": null,
+  "plan": "free", "plan_vigente_hasta": null
+}
+```
+Nace siempre en plan `free` — activar un plan pagado es `POST /negocios/{negocio}/suscripcion` (ver Billing), no un campo de esta creación.
 
 ### `GET /negocios/{negocio}` 🔒 · `PATCH /negocios/{negocio}` 🔒
 
-Solo propietario o admin del negocio (§3.2). `PATCH` acepta `nombre_marca` y/o `ruc`.
+Solo propietario o admin del negocio (§3.2). `PATCH` acepta `nombre_marca` y/o `ruc`, ambos opcionales.
+
+`ruc_verificado`/`ruc_verificado_at` y `logo_url`/`portada_url` (derivados de la galería polimórfica `imagen`, §4.4) son de solo lectura todavía: no existe ningún endpoint para subir el logo/portada ni para verificar el RUC (mismo alcance pendiente que la moderación de `reporte`).
+
+### `GET /negocios/{negocio}/miembros` 🔒 · `POST /negocios/{negocio}/miembros` 🔒
+
+Acceso real a la app para el negocio — `admin` o `recepcion` (§3.2, §4.4). **No es lo mismo que contratar un profesional** (`POST /locales/{local}/profesionales`, Staffing): eso es la ficha de trabajo de quien atiende, esto es login/permisos de quien administra. Un mismo negocio puede necesitar las dos cosas para la misma persona, por separado. Mismo permiso que editar el negocio (propietario/admin).
+
+**Body de creación**: `{ "telefono": "0991234567", "rol": "recepcion", "local_id": "uuid" }`.
+- `telefono` resuelve una cuenta **ya registrada** — si no existe ninguna, **422** ("esa persona debe registrarse en la app primero"). Sin invitación por link en esta v1.
+- `rol` ∈ `admin | recepcion` — **nunca** `propietario` (es fijo desde `POST /negocios`, no se otorga por acá).
+- `local_id` opcional — `null` (por defecto) = todos los locales del negocio. Si se manda, debe ser un local de **este** negocio.
+
+**201 / 200** (`GET` devuelve un array):
+```json
+{ "id": "uuid", "usuario_id": "uuid", "usuario_nombre": "Ana Recepción", "negocio_id": "uuid",
+  "rol": "recepcion", "local_id": null, "local_nombre": null, "desde": "2026-09-30", "hasta": null }
+```
+
+### `POST /miembros/{miembro}/terminar` 🔒
+
+Revoca el acceso — pone `hasta = hoy`. **Nunca borra la fila** (mismo criterio que `asignacion`/`turno`: es historial). Sin body.
+
+**422** si `{miembro}` es la membresía del propietario legal del negocio (`negocio.propietario_id`) — no se puede quitar por este camino, ni el propio dueño por error.
 
 ### `POST /negocios/{negocio}/locales` 🔒 · `GET /negocios/{negocio}/locales` 🔒
 
@@ -256,9 +374,10 @@ Crear: solo propietario/admin. Listar: cualquier miembro con rol vigente (propie
 **Body de creación**:
 ```json
 { "nombre": "Sucursal Alborada", "direccion": "Av. Principal 123", "referencia": "diagonal al parque",
-  "lat": -2.1300, "lng": -79.8862, "telefono": "042345678", "whatsapp": "0991234567" }
+  "lat": -2.1300, "lng": -79.8862, "telefono": "042345678", "whatsapp": "0991234567",
+  "lead_time_min": 60, "horizonte_dias": 30, "politica_cancelacion_horas": 2 }
 ```
-`lat`/`lng` son números planos, no un objeto anidado. El local nace en `estado: "borrador"` — no aparece en búsquedas hasta activarlo.
+Solo `nombre`/`direccion`/`lat`/`lng` obligatorios. `lat`/`lng` son números planos, no un objeto anidado. `telefono`/`whatsapp`/`referencia` opcionales, sin default. `lead_time_min`/`horizonte_dias`/`politica_cancelacion_horas` opcionales — si no se mandan, Postgres aplica `60`/`30`/`2` (§5.1: cuánto antes hay que reservar, hasta cuántos días a futuro se puede agendar, y cuántas horas antes se puede cancelar sin penalidad). El local nace en `estado: "borrador"` — no aparece en búsquedas ni acepta citas hasta `POST /locales/{local}/activar`, y todavía sin ningún servicio/horario cargado (ver las secciones de Catalog y "Horarios del local" más abajo) no tendrá ningún slot real que ofrecer aunque se active.
 
 ### `GET /locales/{local}` 🔒 · `PATCH /locales/{local}` 🔒
 
@@ -351,9 +470,11 @@ Solo propietario/admin del local dueño de ese horario. `PATCH` acepta `dia_sema
 
 ---
 
-## Directory — Fotos del local
+## Directory — Imágenes del local
 
-### `GET /locales/{local}/fotos` 🔒 · `POST /locales/{local}/fotos` 🔒
+Galería polimórfica compartida con el profesional (§4.4, revisión de base de datos, 2026-09-28) — reemplaza las antiguas `local_foto`/`profesional_foto`, una tabla por dueño con el mismo shape repetido.
+
+### `GET /locales/{local}/imagenes` 🔒 · `POST /locales/{local}/imagenes` 🔒
 
 `GET`: cualquier miembro. `POST`: solo propietario/admin. La subida del archivo en sí (a un storage) no es parte de esta API todavía — este endpoint solo registra la URL ya subida.
 
@@ -361,16 +482,16 @@ Solo propietario/admin del local dueño de ese horario. `PATCH` acepta `dia_sema
 ```json
 { "url": "https://...", "tipo": "fachada", "orden": 0 }
 ```
-`tipo` ∈ `fachada | interior | trabajo`. `orden` opcional (por defecto `0`, ordena el carrusel).
+`tipo` es el `codigo` del catálogo `tipo_imagen` (`GET /tipos-imagen` no existe todavía — hoy es: `perfil | portada | fachada | interior | muestra`; para el local aplican `fachada | interior | muestra`). `orden` opcional (por defecto `0`, ordena el carrusel).
 
 **201 / 200**:
 ```json
-{ "id": "uuid", "local_id": "uuid", "url": "https://...", "tipo": "fachada", "orden": 0 }
+{ "id": "uuid", "objeto_type": "local", "objeto_id": "uuid", "tipo": "fachada", "url": "https://...", "orden": 0 }
 ```
 
-### `PATCH /fotos/{foto}` 🔒 · `DELETE /fotos/{foto}` 🔒
+### `PATCH /imagenes/{imagen}` 🔒 · `DELETE /imagenes/{imagen}` 🔒
 
-Solo propietario/admin del local dueño de la foto. `PATCH` acepta `url`/`tipo`/`orden`, todos opcionales (para reordenar el carrusel sin volver a mandar la URL). `DELETE` borra la fila de verdad — **204**, sin cuerpo.
+Solo propietario/admin del local (o `actualizar` sobre el profesional) dueño de la imagen — mismo endpoint para las dos galerías (Directory y Staffing), resuelto por el dueño real de la fila. `PATCH` acepta `url`/`tipo`/`orden`, todos opcionales (para reordenar el carrusel sin volver a mandar la URL). `DELETE` borra la fila de verdad — **204**, sin cuerpo.
 
 ---
 
@@ -380,9 +501,9 @@ Solo propietario/admin del local dueño de la foto. `PATCH` acepta `url`/`tipo`/
 
 **Público**, sin autenticación (§7.1-7.3, §8) — la puerta de entrada del cliente antes de tener cuenta. Busca locales `activo` dentro de un radio, ordenados por `score_ranking DESC, distancia ASC`.
 
-**Query**: `?lat=-2.13&lng=-79.8862&radio_m=5000&vertical=barberia&catalogo_servicio_id=uuid&precio_min=5&precio_max=30&amenidades[]=wifi&amenidades[]=parqueo&disponible=true&fecha=2026-09-22&abierto_ahora=true&page=1&limit=20`
+**Query**: `?lat=-2.13&lng=-79.8862&radio_m=5000&rubro=barberia&catalogo_servicio_id=uuid&precio_min=5&precio_max=30&amenidades[]=wifi&amenidades[]=parqueo&disponible=true&fecha=2026-09-22&abierto_ahora=true&page=1&limit=20`
 
-`lat`/`lng` obligatorios. `radio_m` opcional (100-50000, por defecto 5000). `vertical` es el `codigo` de la vertical, no su id. `amenidades[]` exige **todas** las pedidas, no cualquiera (un local con wifi pero sin parqueo no aparece si se piden ambas). `disponible` usa `fecha` si viene, o "hoy" — consulta el read-model `disponibilidad_dia`, no corre el motor de slots por cada resultado. `abierto_ahora` compara contra el horario del día y la hora actual en UTC.
+`lat`/`lng` obligatorios. `radio_m` opcional (100-50000, por defecto 5000). `rubro` es el `codigo` del rubro, no su id. `amenidades[]` exige **todas** las pedidas, no cualquiera (un local con wifi pero sin parqueo no aparece si se piden ambas). `disponible` usa `fecha` si viene, o "hoy" — consulta el read-model `disponibilidad_dia`, no corre el motor de slots por cada resultado. `abierto_ahora` compara contra el horario del día y la hora actual en UTC.
 
 **200**:
 ```json
@@ -394,6 +515,8 @@ Solo propietario/admin del local dueño de la foto. `PATCH` acepta `url`/`tipo`/
 ```
 
 Resultado cacheado 60 s por (coordenadas redondeadas a 2 decimales, ~1 km, más el resto de filtros) — sustituto pragmático de un geohash real, no hay librería instalada. No es un caché para decidir: agendar sigue validándose contra Postgres.
+
+`verificado` exige `local.verificado` **y** `negocio.ruc_verificado` — mismo criterio que `GET /locales/{local}/perfil-publico`, ver ahí.
 
 ### `GET /locales/{local}/perfil-publico`
 
@@ -407,12 +530,19 @@ Resultado cacheado 60 s por (coordenadas redondeadas a 2 decimales, ~1 km, más 
   "verificado": true, "score_ranking": 4.8, "lead_time_min": 60, "horizonte_dias": 30,
   "horarios": [{ "id": "uuid", "local_id": "uuid", "dia_semana": 1, "abre": "09:00", "cierra": "19:00" }],
   "servicios": [{ "id": "uuid", "local_id": "uuid", "catalogo_servicio_id": "uuid", "nombre": "Corte fade", "precio": "8.50", "..." : "..." }],
+  "productos": [{ "id": "uuid", "local_id": "uuid", "nombre": "Pomada", "descripcion": "Fijación fuerte", "precio": "12.50", "foto_url": "https://...", "..." : "..." }],
   "amenidades": [{ "id": "uuid", "codigo": "wifi", "categoria": "confort", "nombre": "WiFi", "icono": "wifi" }],
-  "fotos": [{ "id": "uuid", "local_id": "uuid", "url": "https://...", "tipo": "fachada", "orden": 0 }],
-  "resenas": { "promedio": 4.7, "total": 32 }
+  "imagenes": [{ "id": "uuid", "objeto_type": "local", "objeto_id": "uuid", "tipo": "fachada", "url": "https://...", "orden": 0 }],
+  "profesionales": [{ "id": "uuid", "nombre": "Kevin Ruiz", "alias": "Kevin", "foto_url": "https://...", "resenas_promedio": 4.9 }],
+  "resenas": { "promedio": 4.7, "total": 32 },
+  "es_favorito": false
 }
 ```
-Solo servicios `activo: true` y reseñas `publicada`. `resenas.promedio` es el promedio de `puntaje_local` (0 si no hay ninguna).
+Solo servicios y productos `activo: true`, y reseñas `publicada`. `resenas.promedio` es el promedio de `puntaje_local` (0 si no hay ninguna). `verificado` exige `local.verificado` **y** `negocio.ruc_verificado` (§4.4, revisión de base de datos, 2026-09-28) — no alcanza con que el local solo esté verificado si el negocio dueño no lo está.
+
+`profesionales` (§4.6, §16.1 "público y buscable", confirmado 2026-09-30): el roster de quién atiende, para elegir viendo cara — solo perfiles con `perfil_publico: true` y asignación vigente en este local. Liviano a propósito (no trae bio/portafolio/servicios): para el detalle completo de uno, `GET /profesionales/{profesional}/perfil-publico`. `resenas_promedio` es de `puntaje_profesional`, `0` si no tiene ninguna.
+
+`es_favorito`: `true` si el `Bearer` del request corresponde a un cliente que tiene este local en `GET /mis-favoritos`; `false` si no hay favorito o si la petición viene sin `Authorization` (la ruta sigue siendo pública, el header es opcional). Se calcula en cada request, **nunca** desde el bloque cacheado 1 h — si entrara ahí, el primer usuario que "calienta" el caché le fijaría su propio valor a cualquiera que lo lea después.
 
 ---
 
@@ -422,21 +552,21 @@ Ambos endpoints son **públicos**, sin autenticación — el front los necesita 
 
 ### `GET /catalogo/categorias`
 
-**Query opcional**: `?vertical=barberia` (una de `barberia, estetica, unas, mascotas`).
+**Query opcional**: `?rubro=barberia` (una de `barberia, estetica, unas, mascotas`).
 
 **200**:
 ```json
-[{ "id": "uuid", "vertical": "barberia", "codigo": "corte", "nombre": "Cortes", "icono": "scissors", "orden": 1 }]
+[{ "id": "uuid", "rubro": "barberia", "codigo": "corte", "nombre": "Cortes", "icono": "scissors", "orden": 1 }]
 ```
 
 ### `GET /catalogo/servicios`
 
-**Query opcional**: `?vertical=barberia&categoria=corte` (`categoria` es el `codigo` de una categoría, no su nombre).
+**Query opcional**: `?rubro=barberia&categoria=corte` (`categoria` es el `codigo` de una categoría, no su nombre).
 
 **200**:
 ```json
 [
-  { "id": "uuid", "vertical": "barberia", "categoria_codigo": "corte", "nombre": "Corte fade",
+  { "id": "uuid", "rubro": "barberia", "categoria_codigo": "corte", "nombre": "Corte fade",
     "slug": "barberia-corte-fade", "duracion_base_min": 40, "tipo_recurso": "silla" }
 ]
 ```
@@ -463,7 +593,7 @@ Ambos endpoints son **públicos**, sin autenticación — el front los necesita 
   "precio": "8.50", "precio_desde": false, "duracion_min": 30, "buffer_min": 5,
   "comisionable": true, "activo": true, "tamanos": [] }
 ```
-`precio` viaja como **string** ("8.50"), no como número — es un `numeric(10,2)` de Postgres, y así es como Eloquent lo serializa (evita el redondeo binario de los floats). `nombre` viene del catálogo maestro, no se guarda en `servicio_local`. `tamanos` solo trae filas si se sincronizaron (ver abajo) — para la vertical `mascotas`, modelada pero no activada en la v1.
+`precio` viaja como **string** ("8.50"), no como número — es un `numeric(10,2)` de Postgres, y así es como Eloquent lo serializa (evita el redondeo binario de los floats). `nombre` viene del catálogo maestro, no se guarda en `servicio_local`. `tamanos` solo trae filas si se sincronizaron (ver abajo) — para el rubro `mascotas`, modelado pero no activado en la v1.
 
 ### `PATCH /servicios/{servicio}` 🔒 · `DELETE /servicios/{servicio}` 🔒
 
@@ -473,7 +603,7 @@ Solo propietario/admin del local dueño del servicio. `PATCH` acepta cualquier c
 
 ### `PUT /servicios/{servicio}/tamanos` 🔒
 
-Solo propietario/admin. Reemplaza el conjunto completo de precios por tamaño — obligatorio para la vertical mascotas (bañar un yorkshire no cuesta lo mismo que un golden). Igual que la sincronización de amenidades: se manda la lista final, una lista vacía los quita todos.
+Solo propietario/admin. Reemplaza el conjunto completo de precios por tamaño — obligatorio para el rubro mascotas (bañar un yorkshire no cuesta lo mismo que un golden). Igual que la sincronización de amenidades: se manda la lista final, una lista vacía los quita todos.
 
 **Body**:
 ```json
@@ -484,7 +614,9 @@ Solo propietario/admin. Reemplaza el conjunto completo de precios por tamaño �
 ```
 `tamano` ∈ `muy_pequeno | pequeno | mediano | grande | gigante`, sin repetirse dentro de la misma lista.
 
-**200**: array de `{ "tamano", "precio", "duracion_min" }`.
+**200**: array de `{ "tamano", "precio", "duracion_min" }`. **422** si el servicio no pertenece al rubro `mascotas` — un corte de barbería no admite precio por tamaño de mascota.
+
+Al agendar una cita con `mascota_id`, si el servicio tiene una fila para el tamaño de esa mascota, `cita_item.precio`/`duracion_min` (y por lo tanto `cita.fin`) usan ese precio/duración en vez del plano de `servicio_local` (§4.5, §5.1). Sin `mascota_id`, o si el tamaño no tiene fila propia, se usa el plano.
 
 ---
 
@@ -492,22 +624,23 @@ Solo propietario/admin. Reemplaza el conjunto completo de precios por tamaño �
 
 ### `GET /locales/{local}/productos` 🔒 · `POST /locales/{local}/productos` 🔒
 
-`GET`: cualquier miembro. `POST`: solo propietario/admin. Productos (pomada, cera, shampoo) llevan su propio porcentaje de comisión, distinto al de un servicio (§4.5) — importan para que la liquidación de comisiones sea correcta, aunque esa liquidación esté fuera de la v1.
+`GET`: cualquier miembro. `POST`: solo propietario/admin. Productos (pomada, cera, shampoo) llevan su propio porcentaje de comisión, distinto al de un servicio (§4.5) — importan para que la liquidación de comisiones sea correcta, aunque esa liquidación esté fuera de la v1. Los `activo: true` de un local también aparecen en su `GET /locales/{local}/perfil-publico` (solo exhibición informativa — sin catálogo maestro ni flujo de compra).
 
 **Body de creación**:
 ```json
-{ "nombre": "Pomada", "precio": 12.50, "comision_pct": 10 }
+{ "nombre": "Pomada", "descripcion": "Fijación fuerte, acabado mate", "precio": 12.50, "comision_pct": 10, "foto_url": "https://..." }
 ```
-`comision_pct` opcional, `0` a `100`, `0` si se omite.
+`descripcion`/`foto_url` opcionales. `comision_pct` opcional, `0` a `100`, `0` si se omite. `foto_url` no se guarda tal cual: crea (o reemplaza) la imagen del producto en la galería polimórfica `imagen` (§4.4) y apunta `foto_id` — el campo de salida es el mismo, pero se deriva de esa relación.
 
 **201 / 200**:
 ```json
-{ "id": "uuid", "local_id": "uuid", "nombre": "Pomada", "precio": "12.50", "comision_pct": "0.00", "activo": true }
+{ "id": "uuid", "local_id": "uuid", "nombre": "Pomada", "descripcion": "Fijación fuerte, acabado mate",
+  "precio": "12.50", "comision_pct": "0.00", "foto_url": "https://...", "activo": true }
 ```
 
 ### `PATCH /productos/{producto}` 🔒 · `DELETE /productos/{producto}` 🔒
 
-Solo propietario/admin. `PATCH` acepta `nombre`/`precio`/`comision_pct`, todos opcionales. `DELETE` desactiva (`activo: false`), no borra — mismo motivo que en servicios. **204**, sin cuerpo.
+Solo propietario/admin. `PATCH` acepta `nombre`/`descripcion`/`precio`/`comision_pct`/`foto_url`, todos opcionales. `DELETE` desactiva (`activo: false`), no borra — mismo motivo que en servicios. **204**, sin cuerpo.
 
 ---
 
@@ -521,13 +654,13 @@ Cómo un local pide que la plataforma agregue un servicio que le falta (§4.5).
 
 **Body de creación**:
 ```json
-{ "vertical": "barberia", "nombre_propuesto": "Afeitado a navaja", "descripcion": "Con toalla caliente" }
+{ "rubro": "barberia", "nombre_propuesto": "Afeitado a navaja", "descripcion": "Con toalla caliente" }
 ```
 `descripcion` opcional.
 
 **201 / 200**:
 ```json
-{ "id": "uuid", "local_id": "uuid", "vertical": "barberia", "nombre_propuesto": "Afeitado a navaja",
+{ "id": "uuid", "local_id": "uuid", "solicitante_id": "uuid", "rubro": "barberia", "nombre_propuesto": "Afeitado a navaja",
   "descripcion": "Con toalla caliente", "estado": "pendiente", "motivo_rechazo": null }
 ```
 
@@ -544,26 +677,38 @@ Cómo un local pide que la plataforma agregue un servicio que le falta (§4.5).
 **Body de creación** (dos grupos: datos del profesional + su primera asignación):
 ```json
 { "nombre": "Kevin Ruiz", "alias": "Kevin", "bio": "10 años de experiencia", "foto_url": "https://...",
-  "independiente": false, "perfil_publico": true, "traslado_min": 30,
+  "perfil_publico": true, "traslado_min": 30, "telefono": "0991234567",
   "rol": "barbero", "modalidad": "empleado", "comision_pct": 50, "desde": "2026-09-01" }
 ```
-`alias`, `bio`, `foto_url`, `independiente`, `perfil_publico`, `traslado_min`, `desde` son opcionales (`independiente: false`, `perfil_publico: true`, `traslado_min: 30` si se omiten). `rol` ∈ `barbero | estilista | manicurista | groomer | recepcion`. `modalidad` ∈ `empleado | renta_silla | invitado`.
+`alias`, `bio`, `foto_url`, `perfil_publico`, `traslado_min`, `desde` son opcionales (`perfil_publico: true`, `traslado_min: 30` si se omiten). `rol` ∈ `barbero | estilista | manicurista | groomer | recepcion`. `modalidad` ∈ `empleado | renta_silla | invitado`. `foto_url` no se guarda tal cual: crea (o reemplaza) la imagen `perfil` del profesional en la galería polimórfica `imagen` y apunta `foto_perfil_id` — el campo de salida es el mismo, pero se deriva de esa relación (§4.4).
+
+`telefono` opcional (§4.6): si el profesional ya tiene cuenta en la app, la vincula de una vez (resuelve por `telefono` de una cuenta **ya registrada** — si no existe ninguna, **422**). Sin esto, nace sin cuenta y el local gestiona su agenda — se puede vincular después con `POST /profesionales/{profesional}/vincular-cuenta`.
 
 **201 / 200**:
 ```json
 { "id": "uuid", "nombre": "Kevin Ruiz", "alias": "Kevin", "bio": "10 años de experiencia",
-  "foto_url": "https://...", "independiente": false, "perfil_publico": true, "traslado_min": 30,
+  "foto_url": "https://...", "perfil_publico": true, "traslado_min": 30,
   "tiene_cuenta_propia": false }
 ```
 `tiene_cuenta_propia` indica si el profesional tiene `usuario_id` (puede loguearse él mismo) — muchos profesionales no tienen cuenta y los administra el local.
 
 ### `GET /profesionales/{profesional}` 🔒 · `PATCH /profesionales/{profesional}` 🔒
 
-Autorización especial: un profesional **no pertenece a un solo local** (§4.6, puede trabajar en varios) — el acceso se resuelve como "¿administrás AL MENOS UN local donde este profesional tiene una asignación vigente?", no contra un local fijo.
+Autorización: quien administra AL MENOS UN local donde este profesional tiene una asignación vigente (§4.6, un profesional no pertenece a un solo local) — **o el propio profesional**, sobre su propia ficha. `PATCH` acepta `nombre`/`alias`/`bio`/`foto_url`/`perfil_publico`/`traslado_min`, nunca `telefono` (eso es solo del endpoint de abajo, nunca del propio profesional).
 
 Sin `DELETE`: un profesional no se borra nunca; su vínculo laboral se termina con fecha (`POST /asignaciones/{asignacion}/terminar`, ver abajo).
 
 **200**: mismo shape que la creación.
+
+### `POST /profesionales/{profesional}/vincular-cuenta` 🔒
+
+Vincula (o cambia) la cuenta de acceso de este profesional — desde ahí puede iniciar sesión y ver su propia agenda/comisiones. **Solo quien administra el local** — nunca el propio profesional (ni para vincularse a sí mismo la primera vez, ni para cambiarse a otra cuenta después): evita que alguien se robe o se desvincule el acceso a sí mismo.
+
+**Body**: `{ "telefono": "0991234567" }` — resuelve una cuenta ya registrada.
+
+**200**: mismo shape que la creación, con `tiene_cuenta_propia: true`.
+
+**Errores**: `422` si el teléfono no corresponde a ninguna cuenta, o si esa cuenta ya está vinculada a otro profesional (`profesional.usuario_id` es único).
 
 ### `GET /profesionales/{profesional}/perfil-publico`
 
@@ -574,28 +719,29 @@ Sin `DELETE`: un profesional no se borra nunca; su vínculo laboral se termina c
 {
   "id": "uuid", "nombre": "Kevin Ruiz", "alias": "Kevin", "bio": "10 años de experiencia",
   "foto_url": "https://...",
-  "fotos": [{ "id": "uuid", "profesional_id": "uuid", "url": "https://...", "orden": 0 }],
+  "imagenes": [{ "id": "uuid", "objeto_type": "profesional", "objeto_id": "uuid", "tipo": "muestra", "url": "https://...", "orden": 0 }],
   "servicios": [{ "id": "uuid", "profesional_id": "uuid", "servicio_local_id": "uuid", "servicio_nombre": "Corte fade", "precio_override": null }],
-  "resenas": { "promedio": 4.9, "total": 18 }
+  "resenas": { "promedio": 4.9, "total": 18 },
+  "es_favorito": false
 }
 ```
 Sin `traslado_min` ni nada operativo. `resenas.promedio` es el promedio de `puntaje_profesional` (0 si no hay ninguna). `servicios` sale de las habilidades del profesional (qué atiende), no de un catálogo aparte.
 
+`es_favorito`: igual regla que en `GET /locales/{local}/perfil-publico` — `true` solo si el `Bearer` (opcional) corresponde a un cliente con este profesional en `GET /mis-favoritos`.
+
 ---
 
-## Staffing — Fotos del profesional
+## Staffing — Imágenes del profesional
 
-### `GET /profesionales/{profesional}/fotos` 🔒 · `POST /profesionales/{profesional}/fotos` 🔒
+Misma galería polimórfica `imagen` que `Directory — Imágenes del local` (ver esa sección para `PATCH`/`DELETE`, que son el mismo endpoint plano para las dos).
 
-Igual patrón que las fotos del local (portafolio de trabajos). `POST`: requiere poder `actualizar` sobre el profesional.
+### `GET /profesionales/{profesional}/imagenes` 🔒 · `POST /profesionales/{profesional}/imagenes` 🔒
+
+Igual patrón que las imágenes del local (portafolio de trabajos). `POST`: requiere poder `actualizar` sobre el profesional. Sin `tipo` en el body: el portafolio del profesional siempre se crea como `muestra` — para la foto de perfil, ver `foto_url` en `POST /locales/{local}/profesionales`.
 
 **Body de creación**: `{ "url": "https://...", "orden": 0 }` (`orden` opcional, por defecto `0`).
 
-**201 / 200**: `{ "id": "uuid", "profesional_id": "uuid", "url": "https://...", "orden": 0 }`
-
-### `PATCH /profesionales/{profesional}/fotos/{foto}` 🔒 · `DELETE /profesionales/{profesional}/fotos/{foto}` 🔒
-
-`PATCH` acepta `url`/`orden`, ambos opcionales. `DELETE` borra la fila de verdad (sin `activo`/`estado`) — **204**, sin cuerpo.
+**201 / 200**: `{ "id": "uuid", "objeto_type": "profesional", "objeto_id": "uuid", "tipo": "muestra", "url": "https://...", "orden": 0 }`
 
 ---
 
@@ -701,6 +847,8 @@ Cierres y ausencias (§4.6): de un **local** (feriado, remodelación), de un **p
 
 **Body de creación** (igual en los tres): `{ "fecha_inicio": "2026-12-25T00:00:00Z", "fecha_fin": "2026-12-26T00:00:00Z", "motivo": "feriado", "nota": null }`. `motivo` ∈ `feriado | vacaciones | mantenimiento | personal | bloqueo_manual`. `fecha_fin` debe ser posterior a `fecha_inicio`.
 
+La de **profesional** (`POST /profesionales/{profesional}/excepciones`) la puede crear quien administra un local donde trabaja, **o el propio profesional sobre sí mismo** (§3.2, "bloquear su propio horario") — nunca sobre un colega.
+
 **201 / 200**: `{ "id": "uuid", "local_id": "uuid"|null, "profesional_id": "uuid"|null, "recurso_id": "uuid"|null, "fecha_inicio": "...", "fecha_fin": "...", "motivo": "feriado", "nota": null }` — solo uno de `local_id`/`profesional_id`/`recurso_id` viene lleno, según el origen usado.
 
 ### `DELETE /excepciones/{excepcion}` 🔒
@@ -715,15 +863,18 @@ Autoriza contra el dueño real de la excepción (local, profesional o recurso, s
 
 **Público**, sin autenticación — el cliente necesita ver horarios antes de tener cuenta. Motor de slots (§5): aplica los 10 filtros (horario del local, turno del profesional con overrides de `turno_fecha`, habilidad, excepciones, citas existentes en cualquier local con `traslado_min` si es de otro local, recurso libre, anticipación mínima, horizonte máximo). Candidatos cada 15 minutos.
 
-**Query**: `?fecha=2026-09-22&servicios[]=uuid&servicios[]=uuid&profesional_id=uuid` — `fecha` y `servicios` obligatorios (al menos un `servicio_local_id`); `profesional_id` opcional, para pedir la disponibilidad de un profesional concreto en vez de todos los elegibles.
+**Query**: `?fecha=2026-09-22&servicios[]=uuid&servicios[]=uuid&profesional_id=uuid&mascota_id=uuid` — `fecha` y `servicios` obligatorios (al menos un `servicio_local_id`); `profesional_id` opcional, para pedir la disponibilidad de un profesional concreto en vez de todos los elegibles; `mascota_id` opcional — si el servicio varía precio/duración por tamaño (§4.5, `servicio_local_tamano`) y la mascota tiene un tamaño con fila propia, la ventana del slot refleja esa duración en vez de la plana del servicio.
 
 **200**:
 ```json
 [
-  { "profesional_id": "uuid", "recurso_id": "uuid"|null, "inicio": "2026-09-22T14:00:00Z", "fin": "2026-09-22T14:30:00Z" }
+  { "profesional_id": "uuid", "profesional_nombre": "Kevin Ruiz", "profesional_alias": "Kevin", "profesional_foto_url": "https://...",
+    "recurso_id": "uuid"|null, "inicio": "2026-09-22T14:00:00Z", "fin": "2026-09-22T14:30:00Z" }
 ]
 ```
 `recurso_id` solo viene lleno si el servicio pedido necesita un tipo de recurso concreto (`catalogo_servicio.tipo_recurso` distinto de `ninguno`) y hay uno libre en esa ventana — si no hay ninguno libre, esa combinación de horario simplemente no aparece en la lista.
+
+`profesional_nombre`/`profesional_alias`/`profesional_foto_url` (§16.1 "público y buscable", confirmado 2026-09-30): antes el slot solo traía el UUID pelado — el cliente no tenía cómo saber quién es quién sin una consulta aparte. `profesional_alias`/`profesional_foto_url` pueden venir `null`.
 
 La disponibilidad se cachea 15 minutos por (local, profesional, día) y se invalida por evento (turno o excepción modificada), nunca solo por TTL — cancelar algo en Staffing libera el slot ya, no en 15 minutos.
 
@@ -741,17 +892,17 @@ reservada ──confirma──> confirmada ──llega──> en_curso ──ter
                              ▼
                   cancelada_* / no_show / reagendada
 ```
-`completada`, `cancelada_cliente`, `cancelada_local`, `no_show`, `expirada` y `reagendada` son terminales. Cada transición queda auditada en `cita_evento` (quién, cuándo, de qué estado a cuál).
+`completada`, `cancelada_cliente`, `cancelada_local`, `no_show`, `expirada` y `reagendada` son terminales. Cada transición queda auditada en `cita_bitacora` (quién, cuándo, de qué estado a cuál).
 
 ### `GET /locales/{local}/citas` 🔒 · `GET /citas/{cita}` 🔒
 
-`index`: cualquier miembro con rol en el local (propietario, admin o recepción) — la agenda del local. Filtros de query opcionales: `?fecha=2026-09-22&profesional_id=uuid&estado=confirmada`. `show`: el mismo staff, **o el cliente dueño de la cita**.
+`index`: cualquier miembro con rol en el local (propietario, admin o recepción) — la agenda del local. Filtros de query opcionales: `?fecha=2026-09-22&profesional_id=uuid&estado=confirmada`. `show`: el mismo staff, el cliente dueño de la cita, **o el propio profesional asignado** (§3.2) — ver también `GET /mis-citas-profesional` para su agenda completa sin pedir una cita por id.
 
 **200** (`show`, y cada elemento del array de `index`):
 ```json
 { "id": "uuid", "local_id": "uuid", "profesional_id": "uuid", "recurso_id": "uuid"|null,
   "cliente_id": "uuid", "cliente_telefono": null, "inicio": "...", "fin": "...", "estado": "confirmada", "canal": "app",
-  "precio_total": "25.00", "propina": "0.00", "metodo_pago": null, "cliente_nuevo": true,
+  "precio_total": "25.00", "propina": "0.00", "metodo_pago_id": null, "cliente_nuevo": true,
   "para_tipo": "titular", "para_nombre": null, "mascota_id": null, "nota_cliente": null,
   "codigo": "AB12CD34", "reagendada_de_id": null,
   "expira_at": null, "confirmada_at": "...", "cancelada_at": null, "completada_at": null,
@@ -767,6 +918,16 @@ Historial del cliente autenticado (§7.6): cruza **todos** los locales que visit
 **Query opcional**: `?estado=completada&local_id=uuid`.
 
 **200**: array con el mismo shape de `show`, ordenado por `inicio` descendente.
+
+### `GET /mis-citas-profesional` 🔒
+
+Agenda propia del profesional (§3.2) — igual que arriba, cruza todos los locales donde trabaja, sin scoping a uno. Requiere que la cuenta tenga un perfil de `Profesional` vinculado (`POST /profesionales/{profesional}/vincular-cuenta`).
+
+**Query opcional**: `?estado=confirmada&local_id=uuid`.
+
+**200**: array con el mismo shape de `show`, ordenado por `inicio` descendente.
+
+**403** (`codigo: "no_es_profesional"`) si la cuenta autenticada no tiene ningún `Profesional` vinculado.
 
 ### `POST /locales/{local}/citas` 🔒 · `Idempotency-Key` obligatorio
 
@@ -795,11 +956,11 @@ El cliente dueño del hold, o el staff del local. `reservada → confirmada`. **
 
 ### `POST /citas/{cita}/iniciar` 🔒
 
-Solo staff — "el cliente llegó". `confirmada → en_curso`. **200** / **422** si no estaba `confirmada`.
+Staff del local, o el propio profesional asignado a esta cita (§3.2) — "el cliente llegó". `confirmada → en_curso`. **200** / **422** si no estaba `confirmada`.
 
 ### `POST /citas/{cita}/completar` 🔒
 
-Solo staff. `en_curso → completada` — el único estado que habilita reseña y cuenta para ranking/liquidación (§6). Actualiza `cliente_local` (total de visitas, primera/última cita).
+Staff del local, o el propio profesional asignado. `en_curso → completada` — el único estado que habilita reseña y cuenta para ranking/liquidación (§6). `total_citas`/`primera_cita_at`/`ultima_cita_at` de la ficha del cliente (§4.7) se calculan en vivo contra `cita` al consultarlos, no se actualiza nada acá.
 
 **Body**: `{ "propina": 5.00 }` (opcional — 100% al profesional, **no** es base de comisión).
 
@@ -813,7 +974,7 @@ El cliente dueño, o el staff del local. `reservada|confirmada|en_curso → canc
 
 ### `POST /citas/{cita}/no-show` 🔒
 
-Solo staff. `confirmada|en_curso → no_show`. Incrementa `cliente_perfil.no_shows`; al llegar a 3, activa `requiere_confirmacion` (la próxima reserva de ese cliente nace `confirmada` directo, sin hold). Libera el slot para la lista de espera. **200** / **422** si no aplica.
+Staff del local, o el propio profesional asignado. `confirmada|en_curso → no_show`. Incrementa `cliente_perfil.no_shows`; al llegar a 3, activa `requiere_confirmacion` (la próxima reserva de ese cliente nace `confirmada` directo, sin hold). Libera el slot para la lista de espera. **200** / **422** si no aplica.
 
 ### `POST /citas/{cita}/reagendar` 🔒
 
@@ -849,6 +1010,43 @@ Cuesta poco, retiene mucho: convierte cancelaciones en citas (§4.7).
    "servicio_local_id": "uuid", "fecha_deseada": "2026-09-22", "desde": "10:00", "hasta": "14:00", "estado": "activa" }]
 ```
 `estado` pasa a `notificada` automáticamente cuando se cancela/no-show/expira una cita que calza (mismo local, misma fecha, mismo servicio, y el mismo profesional si se pidió uno concreto), y a `convertida` cuando ese cliente sí reserva. Sin auto-reserva: el cliente sigue agendando por el flujo normal — esto solo decide a quién avisar primero (para cuando exista el módulo Notifications).
+
+---
+
+## Scheduling — Ficha del cliente
+
+`cliente_local` es continuidad de servicio (§4.7) — preferencias concretas para que el mismo profesional no tenga que volver a preguntar, y para que un suplente pueda replicarlas. **No es una calificación**: la confiabilidad (`cliente_perfil`) es un dato aparte, de uso interno del staff — **nunca se le muestra al propio cliente** (no existe ningún endpoint de "mi confiabilidad"). Mismo permiso en los tres endpoints: propietario, admin o recepción del local (§3.2) — igual que "ver agenda completa".
+
+### `GET /locales/{local}/clientes/{usuario}` 🔒
+
+Ficha individual. `total_citas`/`primera_cita_at`/`ultima_cita_at` se calculan en vivo contra `cita` (solo estado `completada`), no son un contador guardado.
+
+**200**
+```json
+{ "nota": "Fade 2 a los lados, tijera arriba", "profesional_preferido_id": "uuid",
+  "total_citas": 4, "primera_cita_at": "2026-03-01T14:00:00Z", "ultima_cita_at": "2026-09-20T14:00:00Z",
+  "no_shows": 1, "cancelaciones_tardias": 0, "requiere_confirmacion": false }
+```
+Si el cliente nunca visitó este local, responde igual con `total_citas: 0` y fechas `null` (no 404 — la ficha existe conceptualmente aunque `cliente_local` no tenga fila todavía).
+
+`no_shows`/`cancelaciones_tardias`/`requiere_confirmacion` son de la **plataforma completa**, no de este local — `cliente_perfil` es una fila por usuario, no por (usuario, local): un no-show en otro local también importa acá. `requiere_confirmacion: true` significa que `CitaService` ya no le da a este cliente un hold sin confirmar (§5.6, tercer no-show) — es informativo, no hay ninguna acción del staff que lo active o desactive a mano.
+
+### `PUT /locales/{local}/clientes/{usuario}` 🔒
+
+El staff actualiza `nota`/`profesional_preferido_id`. Crea la fila de `cliente_local` si todavía no existe — ya no se crea sola al completar una cita.
+
+**Body**: `{ "nota": "...", "profesional_preferido_id": "uuid"|null }` — ambos opcionales, se actualiza solo lo que venga. `profesional_preferido_id` debe tener asignación vigente en **este** local.
+
+**200**: mismo shape que `GET /locales/{local}/clientes/{usuario}`.
+
+### `GET /locales/{local}/clientes?mes=YYYY-MM` 🔒
+
+Bandeja mensual: un cliente por fila con su recurrencia en ese mes (`estado = 'completada'`). `mes` opcional, por defecto el mes en curso. Cacheado 5 minutos (puro reporte, sin invalidación por evento).
+
+**200**
+```json
+[{ "cliente_id": "uuid", "cliente_nombre": "Ana Pérez", "visitas_en_el_mes": 2, "ultima_visita": "2026-09-20T14:00:00Z" }]
+```
 
 ---
 
@@ -898,13 +1096,13 @@ Cualquier usuario autenticado reporta una reseña, foto, local o profesional (§
 
 **Body**:
 ```json
-{ "tipo": "resena", "objeto_id": "uuid", "motivo": "spam", "detalle": "Comentario repetido" }
+{ "objeto_type": "resena", "objeto_id": "uuid", "motivo": "spam", "detalle": "Comentario repetido" }
 ```
-`tipo` ∈ `resena | foto | local | profesional`. `motivo` ∈ `difamacion | contenido_inapropiado | falso | spam | otro`. `detalle` opcional.
+`objeto_type` ∈ `resena | foto | local | profesional` (`foto` apunta a la galería polimórfica `imagen`, ver arriba). `motivo` ∈ `difamacion | contenido_inapropiado | falso | spam | otro`. `detalle` opcional.
 
 **201**:
 ```json
-{ "id": "uuid", "tipo": "resena", "objeto_id": "uuid", "reportante_id": "uuid",
+{ "id": "uuid", "objeto_type": "resena", "objeto_id": "uuid", "reportante_id": "uuid",
   "motivo": "spam", "detalle": "Comentario repetido", "estado": "pendiente" }
 ```
 
@@ -984,7 +1182,7 @@ La suscripción más reciente del negocio. Mismo shape que la creación.
 
 ### `POST /suscripciones/{suscripcion}/cancelar`
 
-Cancela de inmediato (`estado: "cancelada"`) y el negocio vuelve a `free` ya mismo — la v1 no modela periodo de gracia por falta de cobro real. Sin body.
+Marca `estado: "cancelada"`. El negocio **sigue en su plan actual** hasta que se cumpla el período ya pagado (mensual o anual) — el downgrade a `free` lo hace el job diario `ActualizarVigenciaSuscripciones` (§9.6, §10.1, revisión de base de datos, 2026-09-28), no este endpoint. Sin body.
 
 ### `GET /negocios/{negocio}/cobros`
 
@@ -994,7 +1192,11 @@ Historial de cobros de todas las suscripciones del negocio.
 
 ### `POST /cobros/{cobro}/marcar-pagado`
 
-Registro administrativo (no hay pasarela real, §10.1). Pone `estado: "pagado"`, `pagado_at`, y emite `comprobante_sri` a través del puerto de facturación electrónica. Sin body.
+Registro administrativo (no hay pasarela real, §10.1). Solo válido desde `pendiente`/`fallido` — contra un cobro ya `pagado`/`reembolsado` responde **422** (evita reemitir un `comprobante_sri` duplicado). Pone `estado: "pagado"`, `pagado_at`, y emite `comprobante_sri` a través del puerto de facturación electrónica. Sin body.
+
+### `POST /cobros/{cobro}/marcar-reembolsado`
+
+Solo válido desde `pagado` — cualquier otro estado responde **422**. Sin body.
 
 ### `GET /locales/{local}/liquidaciones` · `POST /locales/{local}/liquidaciones`
 
@@ -1022,6 +1224,12 @@ Solo desde `borrador`. Recalcula una última vez (por si algo cambió desde el �
 ### `POST /liquidaciones/{liquidacion}/marcar-pagada`
 
 Solo desde `cerrada` → `pagada`. **422** si no estaba `cerrada`.
+
+### `GET /profesionales/{profesional}/liquidaciones` 🔒
+
+Sus propias comisiones (§3.2), en cualquier local donde trabaje. **Solo el propio profesional** — deliberadamente, ni siquiera propietario/admin (que ya tienen `GET /locales/{local}/liquidaciones`, scopeado a su local): abrir este endpoint también a ellos filtrando por profesional cruzaría datos de otro negocio si el profesional trabaja en varios locales, la misma fuga entre locales que el §3.3 ya prohíbe para otros datos.
+
+**200**: array con el mismo shape que `GET /locales/{local}/liquidaciones`, de todos sus locales mezclados, ordenado por `periodo_desde` descendente.
 
 ---
 

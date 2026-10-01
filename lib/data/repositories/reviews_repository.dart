@@ -56,7 +56,7 @@ class ReviewsRepository {
   }) async {
     try {
       await _dio.post('/reportes', data: {
-        'tipo': tipo,
+        'objeto_type': tipo,
         'objeto_id': objetoId,
         'motivo': motivo,
         if (detalle != null && detalle.isNotEmpty) 'detalle': detalle,

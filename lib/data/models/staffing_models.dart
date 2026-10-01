@@ -9,7 +9,6 @@ class Profesional {
   final String? alias;
   final String? bio;
   final String? fotoUrl;
-  final bool independiente;
   final bool perfilPublico;
   final int traslacionMin;
   final bool tieneCuentaPropia;
@@ -20,7 +19,6 @@ class Profesional {
     this.alias,
     this.bio,
     this.fotoUrl,
-    required this.independiente,
     required this.perfilPublico,
     required this.traslacionMin,
     required this.tieneCuentaPropia,
@@ -32,12 +30,70 @@ class Profesional {
         alias: json['alias'] as String?,
         bio: json['bio'] as String?,
         fotoUrl: json['foto_url'] as String?,
-        independiente: json['independiente'] as bool? ?? false,
         perfilPublico: json['perfil_publico'] as bool? ?? true,
         traslacionMin: json['traslado_min'] as int? ?? 30,
         tieneCuentaPropia: json['tiene_cuenta_propia'] as bool? ?? false,
       );
 }
+
+/// Liquidación de comisiones (§4.7). Los totales de servicios/productos solo
+/// vienen en plan Pro: ausentes (no null) en Free.
+class Liquidacion {
+  final String id;
+  final String localId;
+  final String profesionalId;
+  final String periodoDesde;
+  final String periodoHasta;
+  final String? totalServicios;
+  final String? totalProductos;
+  final String? comisionServicios;
+  final String? comisionProductos;
+  final String totalPropinas;
+  final String totalAPagar;
+  final String estado; // borrador | cerrada | pagada
+  final DateTime? cerradaAt;
+
+  const Liquidacion({
+    required this.id,
+    required this.localId,
+    required this.profesionalId,
+    required this.periodoDesde,
+    required this.periodoHasta,
+    this.totalServicios,
+    this.totalProductos,
+    this.comisionServicios,
+    this.comisionProductos,
+    required this.totalPropinas,
+    required this.totalAPagar,
+    required this.estado,
+    this.cerradaAt,
+  });
+
+  bool get tieneDesglose => comisionServicios != null || comisionProductos != null;
+
+  factory Liquidacion.fromJson(Map<String, dynamic> json) => Liquidacion(
+        id: json['id'] as String,
+        localId: json['local_id'] as String? ?? '',
+        profesionalId: json['profesional_id'] as String? ?? '',
+        periodoDesde: json['periodo_desde'] as String? ?? '',
+        periodoHasta: json['periodo_hasta'] as String? ?? '',
+        totalServicios: json['total_servicios']?.toString(),
+        totalProductos: json['total_productos']?.toString(),
+        comisionServicios: json['comision_servicios']?.toString(),
+        comisionProductos: json['comision_productos']?.toString(),
+        totalPropinas: json['total_propinas']?.toString() ?? '0',
+        totalAPagar: json['total_a_pagar']?.toString() ?? '0',
+        estado: json['estado'] as String? ?? 'borrador',
+        cerradaAt: json['cerrada_at'] == null ? null : DateTime.tryParse(json['cerrada_at'].toString()),
+      );
+}
+
+String textoEstadoLiquidacion(String estado) => switch (estado) {
+      'borrador' => 'Borrador',
+      'cerrada' => 'Cerrada',
+      'pagada' => 'Pagada',
+      _ => estado,
+    };
 
 class ProfesionalFoto {
   final String id;
@@ -54,7 +110,7 @@ class ProfesionalFoto {
 
   factory ProfesionalFoto.fromJson(Map<String, dynamic> json) => ProfesionalFoto(
         id: json['id'] as String,
-        profesionalId: json['profesional_id'] as String,
+        profesionalId: json['objeto_id'] as String? ?? '',
         url: json['url'] as String,
         orden: json['orden'] as int? ?? 0,
       );
@@ -128,7 +184,7 @@ class ProfesionalPerfilPublico {
         alias: json['alias'] as String?,
         bio: json['bio'] as String?,
         fotoUrl: json['foto_url'] as String?,
-        fotos: (json['fotos'] as List<dynamic>? ?? [])
+        fotos: (json['imagenes'] as List<dynamic>? ?? [])
             .map((e) => ProfesionalFoto.fromJson(e as Map<String, dynamic>))
             .toList(),
         servicios: (json['servicios'] as List<dynamic>? ?? [])

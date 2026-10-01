@@ -32,8 +32,6 @@ class BookingAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset('assets/branding/logo.png', width: 22, height: 22),
-          const SizedBox(width: 8),
           Text(
             titulo.toUpperCase(),
             style: Theme.of(context).textTheme.labelLarge?.copyWith(letterSpacing: 1.1),

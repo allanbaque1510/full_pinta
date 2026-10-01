@@ -10,12 +10,12 @@ import '../../core/widgets/list_scaffold.dart';
 import '../../data/models/directory_models.dart';
 import '../../state/repository_providers.dart';
 
-const _tiposFoto = ['fachada', 'interior', 'trabajo'];
+const _tiposFoto = ['fachada', 'interior', 'muestra'];
 
 String _etiquetaTipoFoto(String t) => switch (t) {
       'fachada' => 'Fachada',
       'interior' => 'Interior',
-      'trabajo' => 'Trabajo realizado',
+      'muestra' => 'Trabajo realizado',
       _ => t,
     };
 

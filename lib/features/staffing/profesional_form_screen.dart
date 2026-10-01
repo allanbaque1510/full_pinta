@@ -26,6 +26,7 @@ class _ProfesionalFormScreenState extends ConsumerState<ProfesionalFormScreen> {
   final _aliasCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _comisionCtrl = TextEditingController(text: '50');
+  final _telefonoCtrl = TextEditingController();
   String _rol = rolesStaffing.first;
   String _modalidad = modalidadesAsignacion.first;
   bool _guardando = false;
@@ -36,6 +37,7 @@ class _ProfesionalFormScreenState extends ConsumerState<ProfesionalFormScreen> {
     _aliasCtrl.dispose();
     _bioCtrl.dispose();
     _comisionCtrl.dispose();
+    _telefonoCtrl.dispose();
     super.dispose();
   }
 
@@ -51,6 +53,7 @@ class _ProfesionalFormScreenState extends ConsumerState<ProfesionalFormScreen> {
             rol: _rol,
             modalidad: _modalidad,
             comisionPct: double.tryParse(_comisionCtrl.text.replaceAll(',', '.')) ?? 0,
+            telefono: _telefonoCtrl.text.trim(),
           );
       if (mounted) context.pop();
     } catch (e) {
@@ -87,6 +90,16 @@ class _ProfesionalFormScreenState extends ConsumerState<ProfesionalFormScreen> {
                   controller: _bioCtrl,
                   maxLines: 3,
                   decoration: const InputDecoration(labelText: 'Bio (opcional)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _telefonoCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono de su cuenta (opcional)',
+                    helperText: 'Si ya tiene cuenta en la app, la vincula de una vez. Si no, el local gestiona su agenda.',
+                    helperMaxLines: 2,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(

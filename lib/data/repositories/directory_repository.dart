@@ -43,6 +43,45 @@ class DirectoryRepository {
     }
   }
 
+  // ---- Miembros del negocio ----
+
+  Future<List<NegocioMiembro>> listarMiembros(String negocioId) async {
+    try {
+      final res = await _dio.get('/negocios/$negocioId/miembros');
+      return (res.data as List<dynamic>)
+          .map((e) => NegocioMiembro.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  Future<NegocioMiembro> agregarMiembro(
+    String negocioId, {
+    required String telefono,
+    required String rol,
+    String? localId,
+  }) async {
+    try {
+      final res = await _dio.post('/negocios/$negocioId/miembros', data: {
+        'telefono': telefono,
+        'rol': rol,
+        if (localId != null) 'local_id': localId,
+      });
+      return NegocioMiembro.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  Future<void> terminarMiembro(String miembroId) async {
+    try {
+      await _dio.post('/miembros/$miembroId/terminar');
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
   // ---- Local ----
 
   Future<List<Local>> listarLocales(String negocioId) async {
@@ -63,9 +102,15 @@ class DirectoryRepository {
     required double lng,
     String? telefono,
     String? whatsapp,
+    int? leadTimeMin,
+    int? horizonteDias,
+    int? politicaCancelacionHoras,
   }) async {
     try {
       final res = await _dio.post('/negocios/$negocioId/locales', data: {
+        if (leadTimeMin != null) 'lead_time_min': leadTimeMin,
+        if (horizonteDias != null) 'horizonte_dias': horizonteDias,
+        if (politicaCancelacionHoras != null) 'politica_cancelacion_horas': politicaCancelacionHoras,
         'nombre': nombre,
         'direccion': direccion,
         if (referencia != null && referencia.isNotEmpty) 'referencia': referencia,
@@ -98,9 +143,15 @@ class DirectoryRepository {
     double? lng,
     String? telefono,
     String? whatsapp,
+    int? leadTimeMin,
+    int? horizonteDias,
+    int? politicaCancelacionHoras,
   }) async {
     try {
       final res = await _dio.patch('/locales/$localId', data: {
+        if (leadTimeMin != null) 'lead_time_min': leadTimeMin,
+        if (horizonteDias != null) 'horizonte_dias': horizonteDias,
+        if (politicaCancelacionHoras != null) 'politica_cancelacion_horas': politicaCancelacionHoras,
         if (nombre != null) 'nombre': nombre,
         if (direccion != null) 'direccion': direccion,
         if (referencia != null) 'referencia': referencia,
@@ -229,7 +280,7 @@ class DirectoryRepository {
 
   Future<List<LocalFoto>> listarFotos(String localId) async {
     try {
-      final res = await _dio.get('/locales/$localId/fotos');
+      final res = await _dio.get('/locales/$localId/imagenes');
       return (res.data as List<dynamic>).map((e) => LocalFoto.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
       throw DioClient.mapearError(e);
@@ -243,7 +294,7 @@ class DirectoryRepository {
     int orden = 0,
   }) async {
     try {
-      final res = await _dio.post('/locales/$localId/fotos', data: {
+      final res = await _dio.post('/locales/$localId/imagenes', data: {
         'url': url,
         'tipo': tipo,
         'orden': orden,
@@ -256,7 +307,7 @@ class DirectoryRepository {
 
   Future<void> eliminarFoto(String fotoId) async {
     try {
-      await _dio.delete('/fotos/$fotoId');
+      await _dio.delete('/imagenes/$fotoId');
     } catch (e) {
       throw DioClient.mapearError(e);
     }
@@ -268,7 +319,7 @@ class DirectoryRepository {
     required double lat,
     required double lng,
     int radioM = 20000,
-    String? vertical,
+    String? rubro,
     String? catalogoServicioId,
     double? precioMin,
     double? precioMax,
@@ -283,7 +334,7 @@ class DirectoryRepository {
         'lat': lat,
         'lng': lng,
         'radio_m': radioM,
-        if (vertical != null) 'vertical': vertical,
+        if (rubro != null) 'rubro': rubro,
         if (catalogoServicioId != null) 'catalogo_servicio_id': catalogoServicioId,
         if (precioMin != null) 'precio_min': precioMin,
         if (precioMax != null) 'precio_max': precioMax,

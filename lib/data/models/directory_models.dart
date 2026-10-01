@@ -6,15 +6,101 @@ class Negocio {
   final String nombreMarca;
   final String? ruc;
   final String plan;
+  final bool rucVerificado;
+  final DateTime? rucVerificadoAt;
+  final String? propietarioId;
+  final String? logoUrl;
+  final String? portadaUrl;
+  final DateTime? planVigenteHasta;
 
-  const Negocio({required this.id, required this.nombreMarca, this.ruc, required this.plan});
+  const Negocio({
+    required this.id,
+    required this.nombreMarca,
+    this.ruc,
+    required this.plan,
+    this.rucVerificado = false,
+    this.rucVerificadoAt,
+    this.propietarioId,
+    this.logoUrl,
+    this.portadaUrl,
+    this.planVigenteHasta,
+  });
 
   factory Negocio.fromJson(Map<String, dynamic> json) => Negocio(
         id: json['id'] as String,
         nombreMarca: json['nombre_marca'] as String,
         ruc: json['ruc'] as String?,
         plan: json['plan'] as String? ?? 'free',
+        rucVerificado: json['ruc_verificado'] as bool? ?? false,
+        rucVerificadoAt: json['ruc_verificado_at'] == null
+            ? null
+            : DateTime.tryParse(json['ruc_verificado_at'].toString()),
+        propietarioId: json['propietario_id'] as String?,
+        logoUrl: json['logo_url'] as String?,
+        portadaUrl: json['portada_url'] as String?,
+        planVigenteHasta: json['plan_vigente_hasta'] == null
+            ? null
+            : DateTime.tryParse(json['plan_vigente_hasta'].toString()),
       );
+}
+
+/// `GET /negocios/{id}/miembros` — acceso a la app (admin | recepcion), §4.4.
+class NegocioMiembro {
+  final String id;
+  final String usuarioId;
+  final String? usuarioNombre;
+  final String negocioId;
+  final String rol; // propietario | admin | recepcion
+  final String? localId;
+  final String? localNombre;
+  final String? desde;
+  final String? hasta;
+
+  const NegocioMiembro({
+    required this.id,
+    required this.usuarioId,
+    this.usuarioNombre,
+    required this.negocioId,
+    required this.rol,
+    this.localId,
+    this.localNombre,
+    this.desde,
+    this.hasta,
+  });
+
+  /// Vigente si no tiene `hasta` o este es hoy o futuro.
+  bool get vigente {
+    if (hasta == null) return true;
+    final h = DateTime.tryParse(hasta!);
+    if (h == null) return true;
+    final hoy = DateTime.now();
+    return !DateTime(h.year, h.month, h.day).isBefore(DateTime(hoy.year, hoy.month, hoy.day));
+  }
+
+  factory NegocioMiembro.fromJson(Map<String, dynamic> json) => NegocioMiembro(
+        id: json['id'] as String,
+        usuarioId: json['usuario_id'] as String? ?? '',
+        usuarioNombre: json['usuario_nombre'] as String?,
+        negocioId: json['negocio_id'] as String? ?? '',
+        rol: json['rol'] as String? ?? 'recepcion',
+        localId: json['local_id'] as String?,
+        localNombre: json['local_nombre'] as String?,
+        desde: json['desde'] as String?,
+        hasta: json['hasta'] as String?,
+      );
+}
+
+String textoRolMiembro(String rol) {
+  switch (rol) {
+    case 'propietario':
+      return 'Propietario';
+    case 'admin':
+      return 'Administrador';
+    case 'recepcion':
+      return 'Recepción';
+    default:
+      return rol;
+  }
 }
 
 class Local {
@@ -183,7 +269,7 @@ class LocalFoto {
   final String id;
   final String localId;
   final String url;
-  final String tipo; // fachada | interior | trabajo
+  final String tipo; // fachada | interior | muestra (tipo_imagen, §4.4)
   final int orden;
 
   const LocalFoto({
@@ -196,10 +282,37 @@ class LocalFoto {
 
   factory LocalFoto.fromJson(Map<String, dynamic> json) => LocalFoto(
         id: json['id'] as String,
-        localId: json['local_id'] as String,
+        localId: json['objeto_id'] as String? ?? '',
         url: json['url'] as String,
         tipo: json['tipo'] as String,
         orden: json['orden'] as int? ?? 0,
+      );
+}
+
+/// Roster liviano de `perfil-publico.profesionales` (§4.6, §16.1): para elegir viendo cara.
+class ProfesionalResumen {
+  final String id;
+  final String nombre;
+  final String? alias;
+  final String? fotoUrl;
+  final double resenasPromedio;
+
+  const ProfesionalResumen({
+    required this.id,
+    required this.nombre,
+    this.alias,
+    this.fotoUrl,
+    required this.resenasPromedio,
+  });
+
+  String get nombreVisible => alias != null && alias!.isNotEmpty ? alias! : nombre;
+
+  factory ProfesionalResumen.fromJson(Map<String, dynamic> json) => ProfesionalResumen(
+        id: json['id'] as String,
+        nombre: json['nombre'] as String,
+        alias: json['alias'] as String?,
+        fotoUrl: json['foto_url'] as String?,
+        resenasPromedio: numDeJson(json['resenas_promedio']),
       );
 }
 
@@ -233,6 +346,8 @@ class LocalPerfilPublico {
   final List<ServicioLocal> servicios;
   final List<Amenidad> amenidades;
   final List<LocalFoto> fotos;
+  final List<Producto> productos;
+  final List<ProfesionalResumen> profesionales;
   final ResenasResumen resenas;
   final bool esFavorito;
 
@@ -253,6 +368,8 @@ class LocalPerfilPublico {
     required this.servicios,
     required this.amenidades,
     required this.fotos,
+    this.productos = const [],
+    this.profesionales = const [],
     required this.resenas,
     this.esFavorito = false,
   });
@@ -279,8 +396,14 @@ class LocalPerfilPublico {
         amenidades: (json['amenidades'] as List<dynamic>? ?? [])
             .map((e) => Amenidad.fromJson(e as Map<String, dynamic>))
             .toList(),
-        fotos: (json['fotos'] as List<dynamic>? ?? [])
+        fotos: (json['imagenes'] as List<dynamic>? ?? [])
             .map((e) => LocalFoto.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        productos: (json['productos'] as List<dynamic>? ?? [])
+            .map((e) => Producto.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        profesionales: (json['profesionales'] as List<dynamic>? ?? [])
+            .map((e) => ProfesionalResumen.fromJson(e as Map<String, dynamic>))
             .toList(),
         resenas: ResenasResumen.fromJson(json['resenas'] as Map<String, dynamic>? ?? {}),
         esFavorito: json['es_favorito'] as bool? ?? false,

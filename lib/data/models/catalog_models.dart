@@ -2,7 +2,7 @@
 
 class CategoriaServicio {
   final String id;
-  final String vertical;
+  final String rubro;
   final String codigo;
   final String nombre;
   final String? icono;
@@ -10,7 +10,7 @@ class CategoriaServicio {
 
   const CategoriaServicio({
     required this.id,
-    required this.vertical,
+    required this.rubro,
     required this.codigo,
     required this.nombre,
     this.icono,
@@ -19,7 +19,7 @@ class CategoriaServicio {
 
   factory CategoriaServicio.fromJson(Map<String, dynamic> json) => CategoriaServicio(
         id: json['id'] as String,
-        vertical: json['vertical'] as String,
+        rubro: json['rubro'] as String,
         codigo: json['codigo'] as String,
         nombre: json['nombre'] as String,
         icono: json['icono'] as String?,
@@ -27,9 +27,9 @@ class CategoriaServicio {
       );
 }
 
-const verticalesDisponibles = ['barberia', 'estetica', 'unas', 'mascotas'];
+const rubrosDisponibles = ['barberia', 'estetica', 'unas', 'mascotas'];
 
-String etiquetaVertical(String codigo) {
+String etiquetaRubro(String codigo) {
   switch (codigo) {
     case 'barberia':
       return 'Barbería';
@@ -48,7 +48,7 @@ String etiquetaVertical(String codigo) {
 /// de alta un `ServicioLocal`.
 class CatalogoServicio {
   final String id;
-  final String vertical;
+  final String rubro;
   final String categoriaCodigo;
   final String nombre;
   final String slug;
@@ -57,7 +57,7 @@ class CatalogoServicio {
 
   const CatalogoServicio({
     required this.id,
-    required this.vertical,
+    required this.rubro,
     required this.categoriaCodigo,
     required this.nombre,
     required this.slug,
@@ -67,7 +67,7 @@ class CatalogoServicio {
 
   factory CatalogoServicio.fromJson(Map<String, dynamic> json) => CatalogoServicio(
         id: json['id'] as String,
-        vertical: json['vertical'] as String,
+        rubro: json['rubro'] as String,
         categoriaCodigo: json['categoria_codigo'] as String,
         nombre: json['nombre'] as String,
         slug: json['slug'] as String,
@@ -124,6 +124,8 @@ class Producto {
   final String precio;
   final String comisionPct;
   final bool activo;
+  final String? descripcion;
+  final String? fotoUrl;
 
   const Producto({
     required this.id,
@@ -132,11 +134,15 @@ class Producto {
     required this.precio,
     required this.comisionPct,
     required this.activo,
+    this.descripcion,
+    this.fotoUrl,
   });
 
   factory Producto.fromJson(Map<String, dynamic> json) => Producto(
         id: json['id'] as String,
         localId: json['local_id'] as String,
+        descripcion: json['descripcion'] as String?,
+        fotoUrl: json['foto_url'] as String?,
         nombre: json['nombre'] as String,
         precio: json['precio']?.toString() ?? '0',
         comisionPct: json['comision_pct']?.toString() ?? '0',
@@ -147,7 +153,8 @@ class Producto {
 class SolicitudCatalogo {
   final String id;
   final String localId;
-  final String vertical;
+  final String? solicitanteId;
+  final String rubro;
   final String nombrePropuesto;
   final String? descripcion;
   final String estado; // pendiente | aprobada | rechazada
@@ -156,7 +163,8 @@ class SolicitudCatalogo {
   const SolicitudCatalogo({
     required this.id,
     required this.localId,
-    required this.vertical,
+    this.solicitanteId,
+    required this.rubro,
     required this.nombrePropuesto,
     this.descripcion,
     required this.estado,
@@ -166,7 +174,8 @@ class SolicitudCatalogo {
   factory SolicitudCatalogo.fromJson(Map<String, dynamic> json) => SolicitudCatalogo(
         id: json['id'] as String,
         localId: json['local_id'] as String,
-        vertical: json['vertical'] as String,
+        solicitanteId: json['solicitante_id'] as String?,
+        rubro: json['rubro'] as String,
         nombrePropuesto: json['nombre_propuesto'] as String,
         descripcion: json['descripcion'] as String?,
         estado: json['estado'] as String? ?? 'pendiente',

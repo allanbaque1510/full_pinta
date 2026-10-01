@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Color sólido para el botón destructivo — el token `error`/`AppColors.peligro`
-/// del sistema de diseño es un rosa pálido pensado para texto legible sobre
-/// fondo oscuro, no para rellenar un botón (se ve lavado). Este sí funciona
-/// como relleno.
-const _rojoDestructivo = Color(0xFFE0453A);
+import '../theme/app_theme.dart';
+
+/// Rojo sólido del sistema de diseño para el botón destructivo.
+const _rojoDestructivo = AppColors.peligro;
 
 Future<bool> confirmarDialogo(
   BuildContext context, {

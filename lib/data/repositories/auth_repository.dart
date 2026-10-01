@@ -88,6 +88,47 @@ class AuthRepository {
     }
   }
 
+  /// Recuperar contraseña, paso 1. `canal`: whatsapp | email; se manda
+  /// `telefono` o `email` según corresponda. Devuelve minutos de vigencia.
+  Future<int> olvideContrasena({required String canal, String? telefono, String? email}) async {
+    try {
+      final res = await _dio.post('/auth/contrasena/olvide', data: {
+        'canal': canal,
+        if (canal == 'whatsapp') 'telefono': telefono,
+        if (canal == 'email') 'email': email,
+      });
+      return (res.data['expira_en_minutos'] as int?) ?? 5;
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
+  /// Paso 2: responde como verificar OTP (token + usuario) y revoca las
+  /// sesiones anteriores.
+  Future<SesionIniciada> restablecerContrasena({
+    required String canal,
+    String? telefono,
+    String? email,
+    required String codigo,
+    required String password,
+  }) async {
+    try {
+      final res = await _dio.post('/auth/contrasena/restablecer', data: {
+        'canal': canal,
+        if (canal == 'whatsapp') 'telefono': telefono,
+        if (canal == 'email') 'email': email,
+        'codigo': codigo,
+        'password': password,
+      });
+      final sesion = SesionIniciada.fromJson(res.data as Map<String, dynamic>);
+      await SecureStorage.guardarToken(sesion.token);
+      await SecureStorage.guardarUsuario(sesion.usuario);
+      return sesion;
+    } catch (e) {
+      throw DioClient.mapearError(e);
+    }
+  }
+
   Future<ContextoAcceso> obtenerContexto() async {
     try {
       final res = await _dio.get('/auth/contexto');

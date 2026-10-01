@@ -72,5 +72,14 @@ lib/
 ## DRY — antes de escribir algo nuevo
 
 1. ¿Ya hay un widget en `core/widgets/` que resuelve esto? Úsalo.
-2. ¿Ya hay un modelo o `etiqueta*()`/`texto*()` helper (`textoEstadoCita`, `etiquetaVertical`, `etiquetaRolStaffing`...) para este enum del backend? Reusarlo evita que dos pantallas traduzcan el mismo código a español de forma distinta.
+2. ¿Ya hay un modelo o `etiqueta*()`/`texto*()` helper (`textoEstadoCita`, `etiquetaRubro`, `etiquetaRolStaffing`...) para este enum del backend? Reusarlo evita que dos pantallas traduzcan el mismo código a español de forma distinta.
 3. ¿El patrón de pantalla ya existe en otro módulo (CRUD simple, perfil público, wizard)? Copia la forma, no la lógica — cada pantalla nueva de un patrón conocido debería ser mayormente "cambiar los campos", no reinventar el flujo.
+
+## Diseño visual (mockup oficial: `context/Image.jpg`)
+
+- La app es **modo claro** (`ThemeMode.light`); el oscuro es solo respaldo. Fuente única de colores: `lib/core/theme/app_theme.dart`.
+- Primario **frambuesa** `AppColors.primario` (CTAs, tab activo, slot elegido); `AppColors.primarioSuave` para chips/slots sin seleccionar; verde `AppColors.exito`/`scheme.tertiary` para disponibilidad ("Disponible hoy"); `AppColors.estrella` para estrellas. Nunca `Color(0x...)` suelto en una pantalla: usa `colorScheme` o `AppColors`.
+- Logo: `FullPintaWordmark` (texto, no el PNG naranja del splash antiguo).
+- Navegación inferior del cliente: Explorar · Favoritos · Mis citas · Perfil. Vista negocio: Inicio · Agenda · Clientes · Más.
+- Botones y campos con radio 12; tarjetas blancas con borde `AppColors.borde` y radio 14.
+- Vocabulario: **rubro** (no "vertical"), **imágenes** (no "fotos"), `metodo_pago_id`.

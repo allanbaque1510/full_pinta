@@ -114,6 +114,25 @@ class _AccountHomeScreenState extends ConsumerState<AccountHomeScreen> {
             onTap: () => context.push('/cuenta/notificaciones'),
           ),
           MenuAccessTile(
+            icono: Icons.edit_outlined,
+            titulo: 'Editar perfil',
+            subtitulo: 'Nombre, género, fecha de nacimiento y foto',
+            onTap: () => context.push('/cuenta/perfil'),
+          ),
+          if (usuario?.email != null)
+            MenuAccessTile(
+              icono: usuario!.emailVerificado ? Icons.mark_email_read_outlined : Icons.mark_email_unread_outlined,
+              titulo: usuario.emailVerificado ? 'Correo verificado' : 'Correo sin verificar',
+              subtitulo: usuario.emailVerificado ? usuario.email! : 'Verifica ${usuario.email!} con un código',
+              onTap: () => context.push('/cuenta/verificar-email'),
+            ),
+          MenuAccessTile(
+            icono: Icons.lock_outline,
+            titulo: 'Cambiar contraseña',
+            subtitulo: 'Actualiza tu clave de acceso',
+            onTap: () => context.push('/cuenta/contrasena'),
+          ),
+          MenuAccessTile(
             icono: Icons.shield_outlined,
             titulo: 'Privacidad y consentimientos',
             subtitulo: 'Gestión de datos y seguridad',
@@ -128,7 +147,7 @@ class _AccountHomeScreenState extends ConsumerState<AccountHomeScreen> {
             titulo: 'Crear o administrar negocios',
             subtitulo: 'Acceso a tus locales de barbería o estética',
             contador: negociosActivos > 0 ? '$negociosActivos activo${negociosActivos == 1 ? '' : 's'}' : null,
-            onTap: () => context.push('/negocios/nuevo'),
+            onTap: () => context.push(negociosActivos > 0 ? '/negocios' : '/negocios/nuevo'),
           ),
 
           const SizedBox(height: 16),

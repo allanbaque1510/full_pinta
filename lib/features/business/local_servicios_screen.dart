@@ -143,7 +143,7 @@ class _ServicioFormState extends State<_ServicioForm> {
             value: _catalogoId,
             decoration: const InputDecoration(labelText: 'Servicio del catálogo'),
             items: widget.catalogo
-                .map((c) => DropdownMenuItem(value: c.id, child: Text('${etiquetaVertical(c.vertical)} · ${c.nombre}')))
+                .map((c) => DropdownMenuItem(value: c.id, child: Text('${etiquetaRubro(c.rubro)} · ${c.nombre}')))
                 .toList(),
             onChanged: (v) {
               setState(() {

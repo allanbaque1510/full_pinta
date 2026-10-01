@@ -1,71 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Sistema de diseño "Urban Beauty & Grooming" (ver `design/`, generado con
-/// una IA de diseño y adoptado como identidad de FullPinta): obsidiana
-/// multi-capa + persimmon cálido, con un toque de lavanda y menta para
-/// balancear — pensado para sentirse urbano y unisex, no una app clínica
-/// ni una app financiera. Dark-mode-first a propósito: es la identidad,
-/// no una opción secundaria.
+/// Sistema de diseño de FullPinta según el mockup oficial
+/// (`context/Image.jpg`): lienzo claro y limpio, acento frambuesa para
+/// CTAs/estados activos, verde para disponibilidad y amarillo cálido para
+/// estrellas. Modo claro es la identidad; el oscuro es solo respaldo.
 class AppColors {
   AppColors._();
 
-  static const Color primario = Color(0xFFFB5B36); // persimmon — CTAs, estados activos
-  static const Color exito = Color(0xFF3CDDC7); // menta — completada, disponible, positivo
-  static const Color peligro = Color(0xFFFFB4AB); // legible sobre fondo oscuro
-  static const Color advertencia = Color(0xFFFFB74D); // hold / pendiente
-  static const Color textoSecundario = Color(0xFF9CA3AF);
+  static const Color primario = Color(0xFFC72A5B); // frambuesa — CTAs, estados activos
+  static const Color primarioSuave = Color(0xFFFCE7EE); // fondo de chips/slots
+  static const Color exito = Color(0xFF1E9E57); // "Disponible hoy", completada
+  static const Color exitoSuave = Color(0xFFE3F6EA);
+  static const Color peligro = Color(0xFFD93F3F);
+  static const Color advertencia = Color(0xFFF59E0B); // hold / pendiente
+  static const Color estrella = Color(0xFFF5B301);
+  static const Color textoSecundario = Color(0xFF6B7280);
+  static const Color borde = Color(0xFFECE9EC);
 }
 
 class AppTheme {
   AppTheme._();
 
-  static final ColorScheme _oscuro = const ColorScheme(
-    brightness: Brightness.dark,
-    primary: Color(0xFFFB5B36),
+  static const ColorScheme _claroScheme = ColorScheme(
+    brightness: Brightness.light,
+    primary: AppColors.primario,
     onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFFFB4A3),
-    onPrimaryContainer: Color(0xFF630F00),
-    secondary: Color(0xFFCEBEFA),
-    onSecondary: Color(0xFF35285A),
-    secondaryContainer: Color(0xFF4E4174),
-    onSecondaryContainer: Color(0xFFC0B0EB),
-    tertiary: Color(0xFF3CDDC7),
-    onTertiary: Color(0xFF003731),
-    tertiaryContainer: Color(0xFF00A392),
-    onTertiaryContainer: Color(0xFF00302A),
-    error: Color(0xFFFFB4AB),
-    onError: Color(0xFF690005),
-    errorContainer: Color(0xFF93000A),
-    onErrorContainer: Color(0xFFFFDAD6),
-    surface: Color(0xFF101319),
-    onSurface: Color(0xFFE1E2EB),
-    surfaceDim: Color(0xFF101319),
-    surfaceBright: Color(0xFF363940),
-    surfaceContainerLowest: Color(0xFF0B0E14),
-    surfaceContainerLow: Color(0xFF191C22),
-    surfaceContainer: Color(0xFF1D2026),
-    surfaceContainerHigh: Color(0xFF272A30),
-    surfaceContainerHighest: Color(0xFF32353B),
-    onSurfaceVariant: Color(0xFF9CA3AF),
-    outline: Color(0xFFAA8982),
-    outlineVariant: Color(0xFF5A413B),
-    inverseSurface: Color(0xFFE1E2EB),
-    onInverseSurface: Color(0xFF2D3037),
-    inversePrimary: Color(0xFFB42806),
+    primaryContainer: AppColors.primarioSuave,
+    onPrimaryContainer: Color(0xFF7A1636),
+    secondary: Color(0xFF6D4C8F),
+    onSecondary: Color(0xFFFFFFFF),
+    secondaryContainer: Color(0xFFEFE6F7),
+    onSecondaryContainer: Color(0xFF3B2459),
+    tertiary: AppColors.exito,
+    onTertiary: Color(0xFFFFFFFF),
+    tertiaryContainer: AppColors.exitoSuave,
+    onTertiaryContainer: Color(0xFF0B5A31),
+    error: AppColors.peligro,
+    onError: Color(0xFFFFFFFF),
+    errorContainer: Color(0xFFFDE4E4),
+    onErrorContainer: Color(0xFF7A1D1D),
+    surface: Color(0xFFFFFFFF),
+    onSurface: Color(0xFF1F1F24),
+    surfaceDim: Color(0xFFF1EFF1),
+    surfaceBright: Color(0xFFFFFFFF),
+    surfaceContainerLowest: Color(0xFFFFFFFF),
+    surfaceContainerLow: Color(0xFFFFFFFF),
+    surfaceContainer: Color(0xFFF6F4F6),
+    surfaceContainerHigh: Color(0xFFF1EFF1),
+    surfaceContainerHighest: Color(0xFFEBE8EB),
+    onSurfaceVariant: AppColors.textoSecundario,
+    outline: Color(0xFFC9C5CA),
+    outlineVariant: AppColors.borde,
+    inverseSurface: Color(0xFF2D2D33),
+    onInverseSurface: Color(0xFFF6F4F6),
+    inversePrimary: Color(0xFFFFB1C8),
     shadow: Color(0xFF000000),
     scrim: Color(0xFF000000),
-    surfaceTint: Color(0xFFFB5B36),
+    surfaceTint: Colors.transparent,
   );
 
-  static ThemeData get oscuro => _build(_oscuro);
+  static final ColorScheme _oscuro = ColorScheme.fromSeed(
+    seedColor: AppColors.primario,
+    brightness: Brightness.dark,
+  ).copyWith(primary: const Color(0xFFFF6B93), tertiary: const Color(0xFF3CDDC7));
 
-  /// Sin especificación de modo claro en el sistema de diseño (es
-  /// deliberadamente dark-first) — se deriva de la misma semilla como
-  /// respaldo para dispositivos que fuercen tema claro por accesibilidad.
-  static ThemeData get claro => _build(
-        ColorScheme.fromSeed(seedColor: const Color(0xFFFB5B36), brightness: Brightness.light),
-      );
+  static ThemeData get claro => _build(_claroScheme);
+
+  /// Respaldo para dispositivos que fuercen tema oscuro: el mockup es claro.
+  static ThemeData get oscuro => _build(_oscuro);
 
   static ThemeData _build(ColorScheme scheme) {
     final esOscuro = scheme.brightness == Brightness.dark;
@@ -89,8 +92,8 @@ class AppTheme {
         elevation: 0,
         color: scheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: scheme.onSurface.withValues(alpha: esOscuro ? 0.06 : 0.08)),
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: esOscuro ? scheme.onSurface.withValues(alpha: 0.08) : AppColors.borde),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -98,15 +101,15 @@ class AppTheme {
         filled: true,
         fillColor: scheme.surfaceContainer,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.onSurface.withValues(alpha: 0.08)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -117,7 +120,7 @@ class AppTheme {
           foregroundColor: scheme.onPrimary,
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: textTheme.labelLarge,
         ),
       ),
@@ -128,7 +131,7 @@ class AppTheme {
           elevation: 0,
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: textTheme.labelLarge,
         ),
       ),
@@ -137,7 +140,7 @@ class AppTheme {
           foregroundColor: scheme.onSurface,
           minimumSize: const Size.fromHeight(48),
           side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.14)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: textTheme.labelLarge,
         ),
       ),
@@ -149,7 +152,8 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: scheme.surfaceContainer,
-        selectedColor: scheme.primary.withValues(alpha: 0.16),
+        selectedColor: scheme.primary.withValues(alpha: esOscuro ? 0.24 : 0.12),
+        checkmarkColor: scheme.primary,
         side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.08)),
         labelStyle: textTheme.labelMedium,
         shape: const StadiumBorder(),
@@ -168,8 +172,9 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surfaceContainerLow,
-        indicatorColor: scheme.primary.withValues(alpha: 0.16),
+        backgroundColor: scheme.surface,
+        indicatorColor: Colors.transparent,
+        height: 68,
         elevation: 0,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => textTheme.labelSmall?.copyWith(

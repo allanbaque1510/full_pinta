@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/network/dio_client.dart';
 import '../../core/theme/app_theme.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/primary_button.dart';
 import '../../data/models/catalog_models.dart';
 import '../../data/models/scheduling_models.dart';
 import '../../state/repository_providers.dart';
+import '../../state/session_controller.dart';
 
 /// Vista de staff de una cita (§6): a diferencia de la del cliente, acá se
 /// puede cambiar de estado y ver el teléfono (visible desde `confirmada`,
@@ -131,6 +133,17 @@ class _CitaStaffDetalleScreenState extends ConsumerState<CitaStaffDetalleScreen>
             ],
           ),
           if (cita.clienteTelefono != null) Text('Cliente: ${cita.clienteTelefono}'),
+          // La ficha (incluida la confiabilidad) es solo del staff del negocio:
+          // el profesional no tiene permiso sobre `/locales/{local}/clientes`.
+          if (ref.watch(sessionControllerProvider).contextoActivo?.esNegocio ?? false)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => context.push('/locales/${cita.localId}/clientes/${cita.clienteId}'),
+                icon: const Icon(Icons.person_search_outlined),
+                label: const Text('Ver ficha del cliente'),
+              ),
+            ),
           if (cita.notaCliente != null && cita.notaCliente!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text('Nota: ${cita.notaCliente}'),

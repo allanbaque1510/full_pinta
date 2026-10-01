@@ -30,10 +30,9 @@ class _FullPintaAppState extends ConsumerState<FullPintaApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.claro,
       darkTheme: AppTheme.oscuro,
-      // El sistema de diseño (ver design/) es dark-first a propósito, no un
-      // modo alternativo — se fuerza para que la marca se vea consistente
-      // sin depender de la preferencia del sistema operativo.
-      themeMode: ThemeMode.dark,
+      // El mockup oficial (context/Image.jpg) es claro: se fuerza para que la
+      // marca se vea igual sin depender de la preferencia del sistema.
+      themeMode: ThemeMode.light,
       routerConfig: router,
     );
   }

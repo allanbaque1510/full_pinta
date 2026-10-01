@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/error_state.dart';
+import '../../core/utils/validators.dart';
+import '../../core/widgets/app_bottom_sheet.dart';
+import '../../core/widgets/form_submit_button.dart';
 import '../../core/widgets/menu_access_tile.dart';
 import '../../data/models/staffing_models.dart';
 import '../../state/repository_providers.dart';
@@ -61,6 +64,27 @@ class _ProfesionalAdminScreenState extends ConsumerState<ProfesionalAdminScreen>
 
   bool _terminandoAsignacion = false;
 
+  Future<void> _vincularCuenta() async {
+    await showAppFormSheet(
+      context,
+      title: 'Vincular cuenta',
+      child: _VincularCuentaForm(
+        onGuardar: (telefono) async {
+          try {
+            final actualizado =
+                await ref.read(staffingRepositoryProvider).vincularCuenta(widget.profesionalId, telefono: telefono);
+            if (!mounted) return;
+            Navigator.of(context).pop();
+            setState(() => _profesional = actualizado);
+            mostrarMensaje(context, 'Cuenta vinculada: ya puede iniciar sesión y ver su agenda.');
+          } catch (e) {
+            if (mounted) mostrarError(context, DioClient.mapearError(e).mensaje);
+          }
+        },
+      ),
+    );
+  }
+
   Future<void> _terminarAsignacion() async {
     if (_asignacionEnEsteLocal == null) return;
     final ok = await confirmarDialogo(
@@ -102,6 +126,14 @@ class _ProfesionalAdminScreenState extends ConsumerState<ProfesionalAdminScreen>
               onTap: () => context.push('/asignaciones/${_asignacionEnEsteLocal!.id}/turnos'),
             ),
           MenuAccessTile(
+            icono: Icons.manage_accounts_outlined,
+            titulo: p.tieneCuentaPropia ? 'Cambiar cuenta vinculada' : 'Vincular cuenta de acceso',
+            subtitulo: p.tieneCuentaPropia
+                ? 'Ya tiene cuenta propia: inicia sesión y ve su agenda'
+                : 'Sin cuenta: el local gestiona su agenda',
+            onTap: _vincularCuenta,
+          ),
+          MenuAccessTile(
             icono: Icons.event_repeat_outlined,
             titulo: 'Cambios de turno por fecha',
             onTap: () => context.push('/profesionales/${p.id}/turno-fechas', extra: widget.localId),
@@ -131,6 +163,54 @@ class _ProfesionalAdminScreenState extends ConsumerState<ProfesionalAdminScreen>
               label: const Text('Terminar vínculo con este local'),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VincularCuentaForm extends StatefulWidget {
+  final Future<void> Function(String telefono) onGuardar;
+
+  const _VincularCuentaForm({required this.onGuardar});
+
+  @override
+  State<_VincularCuentaForm> createState() => _VincularCuentaFormState();
+}
+
+class _VincularCuentaFormState extends State<_VincularCuentaForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _telefonoCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _telefonoCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'La persona debe estar registrada en la app. Se vincula por el teléfono de su cuenta.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _telefonoCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'Teléfono de la cuenta'),
+            validator: (v) => AppValidators.requerido(v, 'El teléfono'),
+          ),
+          const SizedBox(height: 16),
+          FormSubmitButton(
+            formKey: _formKey,
+            onGuardar: () => widget.onGuardar(_telefonoCtrl.text.trim()),
+          ),
         ],
       ),
     );
